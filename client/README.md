@@ -1,16 +1,67 @@
-# React + Vite
+# Apres
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A full-stack web application for hospitality shift scheduling, team
+communication, and tip distribution.
 
-Currently, two official plugins are available:
+> **Status:** In development — Capstone Project
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Project Overview
 
-## React Compiler
+Apres is a scheduling and team-management tool built for hospitality
+teams (restaurants, bars, cafes) where shift swaps, availability,
+conflict detection, and fair tip pooling are daily pain points. The goal
+is a single app where managers publish schedules and staff manage
+availability, request swaps, and see tip distributions — without the
+spreadsheet-and-group-chat duct tape most small teams rely on.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This repository is a monorepo containing both the client and the server.
 
-## Expanding the Oxlint configuration
+## Features
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+
+### Implemented
+
+- Express server scaffold with Helmet, CORS, JSON body limits,
+  rate limiting, MongoDB connection setup, and 404/error middleware
+- `GET /api/health` endpoint with a passing Jest/Supertest test
+- Vite/React client that displays live backend health status via Axios
+
+### In progress
+
+- Local client/server environment wiring and dependency setup
+
+### Planned
+
+- Authentication and role-based access control (RBAC)
+- Shift schedules and conflict detection
+- Staff availability management
+- Shift swap requests and approvals
+- Tip pooling and distribution
+- Owner dashboard
+- Team chat (optional)
+- Monitoring and observability (optional)
+
+## Project Structure
+
+
+## Installation Instructions
+
+### Prerequisites
+
+- Node.js (LTS)
+- npm
+- A MongoDB instance (local or Atlas)
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/JohnnyClifford/apres.git
+cd apres
+
+# Server
+cd server
+npm install
+
+# Client
+cd ../client
+npm install
