@@ -33,3 +33,9 @@ yarn-error.log*
 
 # Vercel / Render
 .vercel
+# Env backups / saves
+*.env.save
+*.env.backup
+*.env.bak
+.env.*
+!.env.example
