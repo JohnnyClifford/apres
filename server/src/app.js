@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const authRoutes = require('./routes/auth');
 
 const healthRoutes = require('./routes/health');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
@@ -24,6 +25,7 @@ function createApp() {
   );
 
   app.use('/api/health', healthRoutes);
+  app.use('/api/auth', authRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
