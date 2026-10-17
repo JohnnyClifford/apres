@@ -33,6 +33,7 @@ yarn-error.log*
 
 # Vercel / Render
 .vercel
+
 # Env backups / saves
 *.env.save
 *.env.backup
@@ -40,7 +41,6 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# Env backups
-*.env.save
-*.env.bak
-*.env.backup
+# Test artifacts
+*.tgz
+.cache/
