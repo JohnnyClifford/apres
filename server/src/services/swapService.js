@@ -1,4 +1,4 @@
-const VALID_STATUSES = ['pending', 'accepted', 'approved', 'rejected', 'cancelled'];
+const VALID_STATUSES = ['pending', 'accepted', 'rejected', 'cancelled'];
 
 function isRequesterAssigned(shift, requesterId) {
   if (!shift || !shift.assignedTo) return false;

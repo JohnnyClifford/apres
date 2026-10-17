@@ -50,7 +50,7 @@ describe('hasPendingSwap', () => {
     expect(hasPendingSwap([{ status: 'rejected' }, { status: 'pending' }])).toBe(true);
   });
   it('is false if none are pending', () => {
-    expect(hasPendingSwap([{ status: 'approved' }])).toBe(false);
+    expect(hasPendingSwap([{ status: 'accepted' }])).toBe(false);
   });
   it('is false for an empty list', () => {
     expect(hasPendingSwap([])).toBe(false);
@@ -74,7 +74,7 @@ describe('canTransition', () => {
     expect(canTransition('pending', 'cancelled')).toBe(true);
   });
   it('rejects transitions from non-pending states', () => {
-    expect(canTransition('approved', 'rejected')).toBe(false);
+    expect(canTransition('accepted', 'rejected')).toBe(false);
     expect(canTransition('rejected', 'accepted')).toBe(false);
   });
   it('rejects transitions to invalid statuses', () => {
