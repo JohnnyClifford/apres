@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -74,6 +75,19 @@ router.post('/login', async (req, res, next) => {
     const token = signToken(user);
 
     res.json({ token, user: publicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/auth/me
+router.get('/me', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User no longer exists' });
+    }
+    res.json({ user: publicUser(user) });
   } catch (err) {
     next(err);
   }

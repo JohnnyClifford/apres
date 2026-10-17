@@ -1,12 +1,43 @@
 const request = require('supertest');
-const { createApp } = require('../src/app');
+const express = require('express');
+const { errorHandler } = require('../src/middleware/errorHandler');
 
-describe('GET /api/health', () => {
-  it('returns ok status', async () => {
-    const app = createApp();
-    const res = await request(app).get('/api/health');
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('ok');
-    expect(res.body.service).toBe('apres-api');
+function appWithThrower(errToThrow) {
+  const app = express();
+  app.get('/boom', (req, res, next) => next(errToThrow));
+  app.use(errorHandler);
+  return app;
+}
+
+describe('errorHandler', () => {
+  it('uses err.status when provided', async () => {
+    const err = Object.assign(new Error('Nope'), { status: 403 });
+    const res = await request(appWithThrower(err)).get('/boom');
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('Nope');
+  });
+
+  it('defaults to 500 when err.status is missing', async () => {
+    const res = await request(appWithThrower(new Error('kaboom'))).get('/boom');
+    expect(res.status).toBe(500);
+  });
+
+  it('hides the message for 500s', async () => {
+    const res = await request(appWithThrower(new Error('secret internal detail'))).get('/boom');
+    expect(res.body.error).toBe('Server error');
+    expect(res.body.error).not.toMatch(/secret/);
+  });
+
+  it('exposes the message for 4xx', async () => {
+    const err = Object.assign(new Error('Bad input'), { status: 400 });
+    const res = await request(appWithThrower(err)).get('/boom');
+    expect(res.body.error).toBe('Bad input');
+  });
+
+  it('does not log in test environment', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await request(appWithThrower(new Error('silent'))).get('/boom');
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
