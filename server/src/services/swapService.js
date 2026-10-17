@@ -15,7 +15,7 @@ function areDistinctUsers(fromUserId, toUserId) {
 }
 
 function hasPendingSwap(existingSwaps) {
-  return existingSwaps.some((s) => s.status === 'pending');
+  return (existingSwaps || []).some((s) => s.status === 'pending');
 }
 
 function canResolve(role) {
@@ -33,7 +33,7 @@ function validateSwapRequest({ shift, requesterId, toUserId, existingSwaps, now 
   if (!isRequesterAssigned(shift, requesterId)) return 'You are not assigned to this shift';
   if (!areDistinctUsers(requesterId, toUserId)) return 'You cannot swap with yourself';
   if (!isShiftInFuture(shift, now)) return 'Cannot swap a shift that has already started';
-  if (hasPendingSwap(existingSwaps || [])) return 'This shift already has a pending swap';
+  if (hasPendingSwap(existingSwaps)) return 'This shift already has a pending swap';
   return null;
 }
 

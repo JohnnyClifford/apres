@@ -5,6 +5,8 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const shiftRoutes = require('./routes/shifts');
 const healthRoutes = require('./routes/health');
+const availabilityRoutes = require('./routes/availability');
+const swapRoutes = require('./routes/swaps');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 function createApp() {
@@ -27,6 +29,8 @@ function createApp() {
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/shifts', shiftRoutes);
+  app.use('/api/availability', availabilityRoutes);
+  app.use('/api/swaps', swapRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
