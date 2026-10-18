@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,7 +18,6 @@ function publicUser(user) {
   return { id: user._id, email: user.email, name: user.name, role: user.role };
 }
 
-// POST /api/auth/register
 router.post('/register', async (req, res, next) => {
   try {
     const { email, password, name } = req.body || {};
@@ -50,7 +49,6 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
-// POST /api/auth/login
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
@@ -80,7 +78,6 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// GET /api/auth/me
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -88,6 +85,15 @@ router.get('/me', requireAuth, async (req, res, next) => {
       return res.status(401).json({ error: 'User no longer exists' });
     }
     res.json({ user: publicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/users', requireAuth, requireRole('manager', 'owner'), async (req, res, next) => {
+  try {
+    const users = await User.find().select('-passwordHash'); 
+    res.json({ users });
   } catch (err) {
     next(err);
   }

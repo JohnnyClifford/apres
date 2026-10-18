@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchShifts, createShift } from '../features/shiftsSlice';
-import { useNavigate } from 'react-router-dom';
+import { fetchShifts, createShift, fetchUsers } from '../features/shiftsSlice';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { list: shifts, loading, error } = useSelector((state) => state.shifts);
+  const { list: shifts, users, loading, error } = useSelector((state) => state.shifts);
 
   const [formData, setFormData] = useState({
     venue: 'Main Restaurant',
@@ -17,12 +17,16 @@ export default function Dashboard() {
     startTime: '17:00',
     endTime: '23:00',
     role: 'staff',
+    assignedTo: '', // <-- New field
   });
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
     dispatch(fetchShifts());
-  }, [dispatch]);
+    if (user.role === 'manager' || user.role === 'owner') {
+      dispatch(fetchUsers());
+    }
+  }, [dispatch, user.role]);
 
   const handleLogout = () => {
     logout();
@@ -34,7 +38,7 @@ export default function Dashboard() {
     setFormError('');
     try {
       await dispatch(createShift(formData)).unwrap();
-      setFormData({ ...formData, date: '' });
+      setFormData({ ...formData, date: '', assignedTo: '' });
     } catch (err) {
       setFormError(err);
     }
@@ -50,10 +54,18 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
             <p className="text-gray-600">Welcome, {user.name} ({user.role})</p>
           </div>
-          <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow">
-            Log Out
-          </button>
+          <div className="flex gap-4">
+            {isManager && (
+              <Link to="/tips" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded shadow font-medium flex items-center">
+                Tip Calculator
+              </Link>
+            )}
+            <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow">
+              Log Out
+            </button>
+          </div>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4 border-b pb-2">Upcoming Shifts</h2>
@@ -113,6 +125,21 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Assign To</label>
+                  <select 
+                    value={formData.assignedTo}
+                    onChange={(e) => setFormData({...formData, assignedTo: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                  >
+                    <option value="">-- Leave Unassigned --</option>
+                    {users.map(u => (
+                      <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                </div>
+
                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow">
                   Create Shift
                 </button>

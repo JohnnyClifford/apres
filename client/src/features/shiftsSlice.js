@@ -19,10 +19,20 @@ export const createShift = createAsyncThunk('shifts/createShift', async (shiftDa
   }
 });
 
+export const fetchUsers = createAsyncThunk('shifts/fetchUsers', async (_, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.get('/auth/users');
+    return res.data.users;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to fetch users');
+  }
+});
+
 const shiftsSlice = createSlice({
   name: 'shifts',
   initialState: {
     list: [],
+    users: [],
     loading: false,
     error: null,
   },
@@ -44,6 +54,9 @@ const shiftsSlice = createSlice({
       .addCase(createShift.fulfilled, (state, action) => {
         state.list.push(action.payload);
         state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
+      })
+      .addCase(fetchUsers.fulfilled, (state, action) => {
+        state.users = action.payload;
       });
   },
 });
