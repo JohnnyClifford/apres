@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchShifts, createShift, fetchUsers } from '../features/shiftsSlice';
+import { fetchShifts, createShift, fetchUsers, shiftReceivedViaSocket } from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
+import { socket } from '../api/socket';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -17,7 +18,7 @@ export default function Dashboard() {
     startTime: '17:00',
     endTime: '23:00',
     role: 'staff',
-    assignedTo: '', // <-- New field
+    assignedTo: '',
   });
   const [formError, setFormError] = useState('');
 
@@ -26,6 +27,19 @@ export default function Dashboard() {
     if (user.role === 'manager' || user.role === 'owner') {
       dispatch(fetchUsers());
     }
+
+    socket.connect();
+    
+    const handleNewShift = (newShift) => {
+      dispatch(shiftReceivedViaSocket(newShift));
+    };
+    
+    socket.on('shift:created', handleNewShift);
+
+    return () => {
+      socket.off('shift:created', handleNewShift);
+      socket.disconnect();
+    };
   }, [dispatch, user.role]);
 
   const handleLogout = () => {

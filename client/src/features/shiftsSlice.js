@@ -36,7 +36,15 @@ const shiftsSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    shiftReceivedViaSocket: (state, action) => {
+      const exists = state.list.some((s) => s._id === action.payload._id);
+      if (!exists) {
+        state.list.push(action.payload);
+        state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchShifts.pending, (state) => {
@@ -52,8 +60,11 @@ const shiftsSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(createShift.fulfilled, (state, action) => {
-        state.list.push(action.payload);
-        state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
+        const exists = state.list.some((s) => s._id === action.payload._id);
+        if (!exists) {
+          state.list.push(action.payload);
+          state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
+        }
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.users = action.payload;
@@ -61,4 +72,5 @@ const shiftsSlice = createSlice({
   },
 });
 
+export const { shiftReceivedViaSocket } = shiftsSlice.actions;
 export default shiftsSlice.reducer;

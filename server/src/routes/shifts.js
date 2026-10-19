@@ -48,6 +48,12 @@ router.post('/', requireRole('manager', 'owner'), async (req, res, next) => {
     }
 
     const shift = await Shift.create(candidate);
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('shift:created', shift);
+    }
+
     res.status(201).json({ shift });
   } catch (err) {
     next(err);

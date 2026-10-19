@@ -18,7 +18,8 @@
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.24.5"
+    "mongoose": "^8.24.5",
+    "socket.io": "^4.8.4"
   },
   "keywords": [],
   "author": "",
@@ -31,7 +32,9 @@
     "supertest": "^7.3.1"
   },
   "jest": {
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
     "testEnvironment": "node"
   },
   "overrides": {
