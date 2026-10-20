@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchShifts, createShift, fetchUsers, shiftReceivedViaSocket } from '../features/shiftsSlice';
+import { fetchShifts, createShift, fetchUsers, shiftReceivedViaSocket, socket } from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
-import { socket } from '../api/socket';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();

@@ -88,4 +88,13 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
+router.get('/users', requireAuth, requireRole('manager', 'owner'), async (req, res, next) => {
+  try {
+    const users = await User.find().select('-passwordHash');
+    res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

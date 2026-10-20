@@ -1,5 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { io } from 'socket.io-client';
 import apiClient from '../api/client';
+
+const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '');
+
+export const socket = io(SOCKET_URL, {
+  autoConnect: false,
+});
 
 export const fetchShifts = createAsyncThunk('shifts/fetchShifts', async (_, { rejectWithValue }) => {
   try {
@@ -74,3 +81,15 @@ const shiftsSlice = createSlice({
 
 export const { shiftReceivedViaSocket } = shiftsSlice.actions;
 export default shiftsSlice.reducer;
+
+export const socketMiddleware = (store) => (next) => (action) => {
+  if (!socket.connected) {
+    socket.connect();
+  }
+
+  return next(action);
+};
+
+socket.on('shift:created', (shift) => {
+  console.log('[socket] received new shift:', shift);
+});
