@@ -35,12 +35,6 @@ async function createShift(token, overrides = {}) {
     .send(payload);
 }
 
-// Clean up the test data after all tests run
-afterAll(async () => {
-  await User.deleteMany({ email: { $regex: /@example\.com$/ } });
-  await Shift.deleteMany({ venue: { $in: ['Test Venue', 'A', 'B'] } });
-});
-
 describe('POST /api/shifts', () => {
   it('rejects unauthenticated requests', async () => {
     const res = await request(app).post('/api/shifts').send({});
@@ -131,12 +125,11 @@ describe('PATCH /api/shifts/:id', () => {
   it('updates a shift', async () => {
     const { token } = await registerUser({ email: 'patcher@example.com', role: 'manager' });
     const created = await createShift(token);
-    
-    // FIX: Extract the ID from the created shift correctly
+
     const id = created.body.shift._id;
 
     const res = await request(app)
-      .patch(`/api/shifts/${id}`) // FIX: Use 'id' here instead of 'shiftId'
+      .patch(`/api/shifts/${id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ notes: 'Bring extra napkins' });
       
