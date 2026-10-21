@@ -8,6 +8,11 @@ const swapRequestSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    requestedShift: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Shift',
+      default: null,
+    },
     fromUser: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchShifts, createShift, fetchUsers, deleteShift, shiftReceivedViaSocket, shiftDeletedViaSocket, socket } from '../features/shiftsSlice';
+import {
+  fetchShifts, createShift, fetchUsers, fetchSwaps, deleteShift,
+  shiftReceivedViaSocket, shiftDeletedViaSocket, swapReceivedViaSocket,
+  subscribeToSwapEvents, socket
+} from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
 
@@ -10,11 +14,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { list: shifts, users, loading, error } = useSelector((state) => state.shifts);
+  const { list: shifts, users, swaps, loading, error } = useSelector((state) => state.shifts);
 
   const [viewMode, setViewMode] = useState('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-
+  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatTarget, setChatTarget] = useState('team');
@@ -24,12 +28,19 @@ export default function Dashboard() {
     venue: 'Main Restaurant', date: '', startTime: '17:00', endTime: '23:00', role: 'staff', assignedTo: '',
   });
   const [formError, setFormError] = useState('');
+  
+  const [swapShift, setSwapShift] = useState(null);
+  const [swapTargetId, setSwapTargetId] = useState('');
+  const [swapRequestedShiftId, setSwapRequestedShiftId] = useState('');
+  const [swapError, setSwapError] = useState('');
+  const [submittingSwap, setSubmittingSwap] = useState(false);
 
   useEffect(() => {
     dispatch(fetchShifts());
     if (user.role === 'manager' || user.role === 'owner') {
       dispatch(fetchUsers());
     }
+    dispatch(fetchSwaps());
 
     const fetchChatHistory = async () => {
       try {
@@ -44,15 +55,19 @@ export default function Dashboard() {
     const handleNewShift = (newShift) => dispatch(shiftReceivedViaSocket(newShift));
     const handleDeletedShift = (shiftId) => dispatch(shiftDeletedViaSocket(shiftId));
     const handleNewMessage = (message) => setMessages((prev) => [...prev, message]);
+    const unsubscribeSwapEvents = subscribeToSwapEvents(dispatch);
     
     socket.on('shift:created', handleNewShift);
+    socket.on('shift:updated', handleNewShift);
     socket.on('shift:deleted', handleDeletedShift);
     socket.on('chat:message', handleNewMessage);
 
     return () => {
       socket.off('shift:created', handleNewShift);
+      socket.off('shift:updated', handleNewShift);
       socket.off('shift:deleted', handleDeletedShift);
       socket.off('chat:message', handleNewMessage);
+      unsubscribeSwapEvents();
       socket.disconnect();
     };
   }, [dispatch, user.role]);
@@ -62,11 +77,11 @@ export default function Dashboard() {
   }, [messages, chatTarget]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
-  
   const isManager = user.role === 'manager' || user.role === 'owner';
   const isStaff = user.role === 'staff';
 
-  const getUserName = (userId) => users.find(u => u._id === userId)?.name || 'Assigned';
+  const getId = (value) => (typeof value === 'object' && value !== null ? value._id : value)?.toString();
+  const getUserName = (userId) => users.find(u => getId(u._id) === getId(userId))?.name || 'Assigned';
   const isPastShift = (dateStr) => new Date(dateStr + 'T23:59:59') < new Date();
 
   const handleCreateShift = async (e) => {
@@ -84,6 +99,49 @@ export default function Dashboard() {
     }
   };
 
+  const openSwapRequest = (shift) => {
+    setSwapShift(shift);
+    setSwapTargetId('');
+    setSwapRequestedShiftId('');
+    setSwapError('');
+  };
+
+  const handleRequestSwap = async (e) => {
+    e.preventDefault();
+    if (!swapTargetId) {
+      setSwapError('Choose a colleague to request the swap with.');
+      return;
+    }
+    if (!swapRequestedShiftId) {
+      setSwapError('Choose which of their shifts you want in return.');
+      return;
+    }
+    setSubmittingSwap(true);
+    setSwapError('');
+    try {
+      const res = await apiClient.post('/swaps', {
+        shiftId: swapShift._id,
+        toUserId: swapTargetId,
+        requestedShiftId: swapRequestedShiftId,
+      });
+      dispatch(swapReceivedViaSocket(res.data.swap));
+      setSwapShift(null);
+    } catch (err) {
+      setSwapError(err.response?.data?.error || 'Unable to request this swap.');
+    } finally {
+      setSubmittingSwap(false);
+    }
+  };
+
+  const handleResolveSwap = async (swapId, status) => {
+    try {
+      const res = await apiClient.patch(`/swaps/${swapId}`, { status });
+      dispatch(swapReceivedViaSocket(res.data.swap));
+    } catch (err) {
+      setSwapError(err.response?.data?.error || 'Unable to update this swap request.');
+    }
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -94,16 +152,18 @@ export default function Dashboard() {
 
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
-  
   const daysInMonth = getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
   const firstDay = getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
-  
   const calendarDays = [];
   for (let i = 0; i < firstDay; i++) calendarDays.push(null);
   for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
-
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+
+  // Shifts available for the selected colleague (to trade for)
+  const targetUserShifts = swapTargetId
+    ? shifts.filter(s => getId(s.assignedTo) === swapTargetId)
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -115,16 +175,8 @@ export default function Dashboard() {
             <p className="text-gray-600">Welcome, {user.name} ({user.role})</p>
           </div>
           <div className="flex gap-4">
-            {isManager && (
-              <Link to="/tips" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded shadow font-medium">
-                Tip Calculator
-              </Link>
-            )}
-            {isStaff && (
-              <Link to="/tips" className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded shadow font-medium">
-                My Tip Payouts
-              </Link>
-            )}
+            {isManager && <Link to="/tips" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded shadow font-medium">Tip Calculator</Link>}
+            {isStaff && <Link to="/tips" className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded shadow font-medium">My Tip Payouts</Link>}
             <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow">Log Out</button>
           </div>
         </div>
@@ -148,6 +200,7 @@ export default function Dashboard() {
                 {shifts.length === 0 && <p className="text-gray-500">No shifts scheduled yet.</p>}
                 {shifts.map(shift => {
                   const past = isPastShift(shift.date);
+                  const isMyShift = getId(shift.assignedTo) === getId(user.id || user._id);
                   return (
                     <div key={shift._id} className={`border p-4 rounded flex justify-between items-center ${past ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
                       <div>
@@ -156,16 +209,15 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-3">
                         {shift.assignedTo ? (
-                          <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                            {getUserName(shift.assignedTo)}
-                          </span>
+                          <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">{getUserName(shift.assignedTo)}</span>
                         ) : (
                           <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Unassigned</span>
                         )}
                         {isManager && (
-                          <button onClick={() => handleDeleteShift(shift._id)} className="text-red-500 hover:text-red-700 text-sm font-bold px-2" title="Delete Shift">
-                            ✕
-                          </button>
+                          <button onClick={() => handleDeleteShift(shift._id)} className="text-red-500 hover:text-red-700 text-sm font-bold px-2" title="Delete Shift">✕</button>
+                        )}
+                        {isMyShift && !past && (
+                          <button onClick={() => openSwapRequest(shift)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1 rounded">Request Swap</button>
                         )}
                       </div>
                     </div>
@@ -187,11 +239,9 @@ export default function Dashboard() {
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((day, idx) => {
                     if (!day) return <div key={`empty-${idx}`} className="h-24 bg-gray-50 rounded p-1"></div>;
-                    
                     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const dayShifts = shifts.filter(s => s.date === dateStr);
                     const isToday = dateStr === new Date().toISOString().split('T')[0];
-
                     return (
                       <div key={day} className={`h-24 border rounded p-1 overflow-y-auto text-sm ${isToday ? 'border-blue-500 bg-blue-50' : 'bg-white'}`}>
                         <span className={`font-bold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</span>
@@ -214,6 +264,40 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-8">
+            {isManager && (
+              <div className="bg-white p-6 rounded-lg shadow h-fit">
+                <h2 className="text-xl font-bold mb-4 border-b pb-2">Pending Swaps</h2>
+                {swapError && <p className="mb-3 rounded bg-red-100 p-2 text-sm text-red-700">{swapError}</p>}
+                {swaps.filter((swap) => swap.status === 'pending').length === 0 ? (
+                  <p className="text-sm text-gray-500">No pending swap requests.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {swaps.filter((swap) => swap.status === 'pending').map((swap) => {
+                      const offered = shifts.find((item) => getId(item._id) === getId(swap.shift));
+                      const requested = swap.requestedShift
+                        ? shifts.find((item) => getId(item._id) === getId(swap.requestedShift))
+                        : null;
+                      return (
+                        <div key={swap._id} className="border rounded p-3 text-sm">
+                          <p className="font-semibold">{getUserName(swap.fromUser)} ⇄ {getUserName(swap.toUser)}</p>
+                          <p className="text-gray-500 mt-1">
+                            Gives: {offered ? `${offered.date} ${offered.startTime}–${offered.endTime}` : '—'}
+                          </p>
+                          <p className="text-gray-500">
+                            Wants: {requested ? `${requested.date} ${requested.startTime}–${requested.endTime}` : '—'}
+                          </p>
+                          <div className="flex gap-2 mt-3">
+                            <button onClick={() => handleResolveSwap(swap._id, 'accepted')} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Approve</button>
+                            <button onClick={() => handleResolveSwap(swap._id, 'rejected')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded">Deny</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {isManager && (
               <div className="bg-white p-6 rounded-lg shadow h-fit">
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Add Shift</h2>
@@ -278,6 +362,63 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {swapShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <form onSubmit={handleRequestSwap} className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
+            <h2 className="text-xl font-bold">Request a shift trade</h2>
+            <p className="text-sm text-gray-600 mt-2">
+              You give: <strong>{swapShift.date} {swapShift.startTime}–{swapShift.endTime}</strong>
+            </p>
+            {swapError && <p className="mt-3 rounded bg-red-100 p-2 text-sm text-red-700">{swapError}</p>}
+
+            <label className="block mt-4 text-sm font-medium text-gray-700">Trade with</label>
+            <select
+              required
+              value={swapTargetId}
+              onChange={(e) => { setSwapTargetId(e.target.value); setSwapRequestedShiftId(''); }}
+              className="mt-1 block w-full px-3 py-2 border rounded-md"
+            >
+              <option value="">Select a colleague</option>
+              {users
+                .filter((c) => getId(c._id) !== getId(user.id || user._id))
+                .map((c) => (
+                  <option key={c._id} value={c._id}>{c.name} ({c.role})</option>
+                ))}
+            </select>
+
+            {swapTargetId && (
+              <>
+                <label className="block mt-4 text-sm font-medium text-gray-700">In exchange for</label>
+                {targetUserShifts.length === 0 ? (
+                  <p className="mt-1 text-sm text-gray-500">
+                    This colleague has no upcoming shifts available for trade.
+                  </p>
+                ) : (
+                  <select
+                    required
+                    value={swapRequestedShiftId}
+                    onChange={(e) => setSwapRequestedShiftId(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select one of their shifts</option>
+                    {targetUserShifts.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.date} {s.startTime}–{s.endTime}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setSwapShift(null)} disabled={submittingSwap} className="px-4 py-2 rounded border">Cancel</button>
+              <button type="submit" disabled={submittingSwap || !swapRequestedShiftId} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-4 py-2 rounded">{submittingSwap ? 'Sending…' : 'Send Request'}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

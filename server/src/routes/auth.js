@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -88,7 +88,8 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
-router.get('/users', requireAuth, requireRole('manager', 'owner'), async (req, res, next) => {
+// Staff need a colleague list to select a recipient for a shift-swap request.
+router.get('/users', requireAuth, async (req, res, next) => {
   try {
     const users = await User.find().select('-passwordHash');
     res.json({ users });
