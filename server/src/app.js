@@ -8,6 +8,7 @@ const healthRoutes = require('./routes/health');
 const availabilityRoutes = require('./routes/availability');
 const swapRoutes = require('./routes/swaps');
 const tipRoutes = require('./routes/tips');
+const chatRoutes = require('./routes/chat');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 function createApp() {
@@ -33,6 +34,7 @@ function createApp() {
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/swaps', swapRoutes);
   app.use('/api/tips', tipRoutes);
+  app.use('/api/chat', chatRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

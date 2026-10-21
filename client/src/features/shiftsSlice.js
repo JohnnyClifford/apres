@@ -4,9 +4,7 @@ import apiClient from '../api/client';
 
 const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '');
 
-export const socket = io(SOCKET_URL, {
-  autoConnect: false,
-});
+export const socket = io(SOCKET_URL, { autoConnect: false });
 
 export const fetchShifts = createAsyncThunk('shifts/fetchShifts', async (_, { rejectWithValue }) => {
   try {
@@ -26,6 +24,15 @@ export const createShift = createAsyncThunk('shifts/createShift', async (shiftDa
   }
 });
 
+export const deleteShift = createAsyncThunk('shifts/deleteShift', async (id, { rejectWithValue }) => {
+  try {
+    await apiClient.delete(`/shifts/${id}`);
+    return id;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to delete shift');
+  }
+});
+
 export const fetchUsers = createAsyncThunk('shifts/fetchUsers', async (_, { rejectWithValue }) => {
   try {
     const res = await apiClient.get('/auth/users');
@@ -37,12 +44,7 @@ export const fetchUsers = createAsyncThunk('shifts/fetchUsers', async (_, { reje
 
 const shiftsSlice = createSlice({
   name: 'shifts',
-  initialState: {
-    list: [],
-    users: [],
-    loading: false,
-    error: null,
-  },
+  initialState: { list: [], users: [], loading: false, error: null },
   reducers: {
     shiftReceivedViaSocket: (state, action) => {
       const exists = state.list.some((s) => s._id === action.payload._id);
@@ -51,21 +53,15 @@ const shiftsSlice = createSlice({
         state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
       }
     },
+    shiftDeletedViaSocket: (state, action) => {
+      state.list = state.list.filter(s => s._id !== action.payload);
+    }
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchShifts.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchShifts.fulfilled, (state, action) => {
-        state.loading = false;
-        state.list = action.payload;
-      })
-      .addCase(fetchShifts.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
+      .addCase(fetchShifts.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchShifts.fulfilled, (state, action) => { state.loading = false; state.list = action.payload; })
+      .addCase(fetchShifts.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
       .addCase(createShift.fulfilled, (state, action) => {
         const exists = state.list.some((s) => s._id === action.payload._id);
         if (!exists) {
@@ -73,23 +69,12 @@ const shiftsSlice = createSlice({
           state.list.sort((a, b) => new Date(a.date + 'T' + a.startTime) - new Date(b.date + 'T' + b.startTime));
         }
       })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
-        state.users = action.payload;
-      });
+      .addCase(deleteShift.fulfilled, (state, action) => {
+        state.list = state.list.filter(s => s._id !== action.payload);
+      })
+      .addCase(fetchUsers.fulfilled, (state, action) => { state.users = action.payload; });
   },
 });
 
-export const { shiftReceivedViaSocket } = shiftsSlice.actions;
+export const { shiftReceivedViaSocket, shiftDeletedViaSocket } = shiftsSlice.actions;
 export default shiftsSlice.reducer;
-
-export const socketMiddleware = (store) => (next) => (action) => {
-  if (!socket.connected) {
-    socket.connect();
-  }
-
-  return next(action);
-};
-
-socket.on('shift:created', (shift) => {
-  console.log('[socket] received new shift:', shift);
-});

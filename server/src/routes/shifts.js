@@ -60,6 +60,22 @@ router.post('/', requireRole('manager', 'owner'), async (req, res, next) => {
   }
 });
 
+router.delete('/:id', requireRole('manager', 'owner'), async (req, res, next) => {
+  try {
+    const deleted = await Shift.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Shift not found' });
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('shift:deleted', deleted._id);
+    }
+    
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/:id', requireRole('manager', 'owner'), async (req, res, next) => {
   try {
     const shift = await Shift.findById(req.params.id);
@@ -68,7 +84,7 @@ router.patch('/:id', requireRole('manager', 'owner'), async (req, res, next) => 
     Object.assign(shift, req.body || {});
 
     if (shift.assignedTo) {
-      const sameVenue = await Shift.find({ venue: shift.venue, assignedTo: shift.assignedTo });
+      const sameVenue = await Shift.find({ venue: shift.venue, assignedTo: shift.assignedTo, _id: { $ne: shift._id } });
       const conflict = findConflict(shift, sameVenue);
       if (conflict) {
         return res.status(409).json({
@@ -79,17 +95,13 @@ router.patch('/:id', requireRole('manager', 'owner'), async (req, res, next) => 
     }
 
     await shift.save();
-    res.json({ shift });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.delete('/:id', requireRole('manager', 'owner'), async (req, res, next) => {
-  try {
-    const deleted = await Shift.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Shift not found' });
-    res.status(204).end();
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('shift:updated', shift);
+    }
+
+    res.json({ shift });
   } catch (err) {
     next(err);
   }

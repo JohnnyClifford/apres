@@ -7,9 +7,20 @@ const { calculateHours, calculateRoleWeighted, calculateHybrid } = require('../s
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(requireRole('manager', 'owner'));
 
-router.post('/calculate', async (req, res, next) => {
+router.get('/my-payouts', async (req, res, next) => {
+  try {
+    const distributions = await TipDistribution.find({
+      'breakdown.userId': req.user.userId,
+    }).sort({ date: -1 });
+
+    res.json({ distributions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/calculate', requireRole('manager', 'owner'), async (req, res, next) => {
   try {
     const { venue, totalTipsCents, shifts } = req.body || {};
     if (!venue || totalTipsCents === undefined || !Array.isArray(shifts)) {
@@ -29,13 +40,18 @@ router.post('/calculate', async (req, res, next) => {
       distribution = calculateHours(totalTipsCents, shifts);
     }
 
-    res.json({ strategy, distribution });
+    const enhancedDistribution = distribution.map(dist => {
+      const matchingShift = shifts.find(s => s.userId === dist.userId);
+      return { ...dist, hours: matchingShift ? matchingShift.hours : 0 };
+    });
+
+    res.json({ strategy, distribution: enhancedDistribution });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/distribute', async (req, res, next) => {
+router.post('/distribute', requireRole('manager', 'owner'), async (req, res, next) => {
   try {
     const { venue, date, totalTipsCents, shifts } = req.body || {};
     if (!venue || !date || totalTipsCents === undefined || !Array.isArray(shifts)) {

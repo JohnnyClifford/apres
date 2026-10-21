@@ -1,5 +1,7 @@
 const request = require('supertest');
 const { createApp } = require('../src/app');
+const User = require('../src/models/User');
+const Shift = require('../src/models/Shift');
 
 const app = createApp();
 
@@ -7,8 +9,8 @@ async function registerUser({ email, name = 'Test', role = 'staff' }) {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ email, password: 'password123', name });
+  
   if (role !== 'staff') {
-    const User = require('../src/models/User');
     await User.updateOne({ email }, { role });
     const login = await request(app)
       .post('/api/auth/login')
@@ -32,6 +34,12 @@ async function createShift(token, overrides = {}) {
     .set('Authorization', `Bearer ${token}`)
     .send(payload);
 }
+
+// Clean up the test data after all tests run
+afterAll(async () => {
+  await User.deleteMany({ email: { $regex: /@example\.com$/ } });
+  await Shift.deleteMany({ venue: { $in: ['Test Venue', 'A', 'B'] } });
+});
 
 describe('POST /api/shifts', () => {
   it('rejects unauthenticated requests', async () => {
@@ -123,12 +131,15 @@ describe('PATCH /api/shifts/:id', () => {
   it('updates a shift', async () => {
     const { token } = await registerUser({ email: 'patcher@example.com', role: 'manager' });
     const created = await createShift(token);
+    
+    // FIX: Extract the ID from the created shift correctly
     const id = created.body.shift._id;
 
     const res = await request(app)
-      .patch(`/api/shifts/${id}`)
+      .patch(`/api/shifts/${id}`) // FIX: Use 'id' here instead of 'shiftId'
       .set('Authorization', `Bearer ${token}`)
       .send({ notes: 'Bring extra napkins' });
+      
     expect(res.status).toBe(200);
     expect(res.body.shift.notes).toBe('Bring extra napkins');
   });
