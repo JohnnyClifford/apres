@@ -62,7 +62,9 @@ export default function Dashboard() {
   }, [messages, chatTarget]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+  
   const isManager = user.role === 'manager' || user.role === 'owner';
+  const isStaff = user.role === 'staff';
 
   const getUserName = (userId) => users.find(u => u._id === userId)?.name || 'Assigned';
   const isPastShift = (dateStr) => new Date(dateStr + 'T23:59:59') < new Date();
@@ -106,6 +108,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
+        
         <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
@@ -115,6 +118,11 @@ export default function Dashboard() {
             {isManager && (
               <Link to="/tips" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded shadow font-medium">
                 Tip Calculator
+              </Link>
+            )}
+            {isStaff && (
+              <Link to="/tips" className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded shadow font-medium">
+                My Tip Payouts
               </Link>
             )}
             <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow">Log Out</button>
