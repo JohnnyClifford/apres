@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createApp } = require('./app');
 const { connectDB } = require('./config/db');
+const Message = require('./models/Message');
 
 const PORT = process.env.PORT || 5000;
 
@@ -21,6 +22,24 @@ async function start() {
 
   io.on('connection', (socket) => {
     console.log(`[socket] user connected: ${socket.id}`);
+
+    socket.on('chat:message', async (data) => {
+      try {
+        const message = await Message.create({
+          sender: data.userId,
+          recipient: data.recipientId || null,
+          content: data.content,
+        });
+
+        await message.populate('sender', 'name role');
+        await message.populate('recipient', 'name role');
+
+        io.emit('chat:message', message);
+      } catch (err) {
+        console.error('[socket] chat error:', err);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`[socket] user disconnected: ${socket.id}`);
     });
