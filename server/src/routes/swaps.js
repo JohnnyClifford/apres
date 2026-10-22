@@ -1,9 +1,9 @@
 const express = require('express');
 const SwapRequest = require('../models/SwapRequest');
 const Shift = require('../models/Shift');
-const { requireAuth, requireRole } = require('../middleware/auth');
-const { canTransition } = require('../services/swapService');
 const User = require('../models/User');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { canTransition, validateSwapRequest } = require('../services/swapService');
 
 const router = express.Router();
 
@@ -19,10 +19,6 @@ router.post('/', async (req, res, next) => {
     const shift = await Shift.findById(shiftId);
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
 
-    if (!shift.assignedTo || shift.assignedTo.toString() !== req.user.userId) {
-      return res.status(403).json({ error: 'You can only request swaps for your own shifts' });
-    }
-
     const targetUser = await User.findById(toUserId);
     if (!targetUser) {
       return res.status(404).json({ error: 'Target user not found' });
@@ -33,7 +29,6 @@ router.post('/', async (req, res, next) => {
       if (String(requestedShiftId) === String(shift._id)) {
         return res.status(400).json({ error: 'Choose a different shift to trade' });
       }
-
       requestedShift = await Shift.findById(requestedShiftId);
       if (!requestedShift) {
         return res.status(404).json({ error: 'Requested shift not found' });
@@ -43,12 +38,23 @@ router.post('/', async (req, res, next) => {
       }
     }
 
+    const existingSwaps = await SwapRequest.find({ shift: shiftId, status: 'pending' });
+    const validation = validateSwapRequest({
+      shift,
+      requesterId: req.user.userId,
+      toUserId,
+      existingSwaps,
+    });
+    if (validation) {
+      return res.status(validation.status).json({ error: validation.error });
+    }
+
     const swap = await SwapRequest.create({
       shift: shiftId,
       requestedShift: requestedShift?._id || null,
       fromUser: req.user.userId,
       toUser: toUserId,
-      status: 'pending'
+      status: 'pending',
     });
 
     const io = req.app.get('io');
@@ -92,23 +98,27 @@ router.patch('/:id', requireRole('manager', 'owner'), async (req, res, next) => 
         Shift.findById(swap.shift),
         swap.requestedShift ? Shift.findById(swap.requestedShift) : null,
       ]);
-      if (!offeredShift) return res.status(409).json({ error: 'The offered shift for this swap no longer exists' });
+      if (!offeredShift) {
+        return res.status(409).json({ error: 'The offered shift for this swap no longer exists' });
+      }
       if (swap.requestedShift && !requestedShift) {
         return res.status(409).json({ error: 'The requested shift for this trade no longer exists' });
       }
 
       if (requestedShift) {
-        // Re-check ownership at approval time in case the schedule changed while pending.
-        if (String(offeredShift.assignedTo) !== String(swap.fromUser) || String(requestedShift.assignedTo) !== String(swap.toUser)) {
-          return res.status(409).json({ error: 'One of these shifts is no longer assigned to the requested trade participants' });
+        if (
+          String(offeredShift.assignedTo) !== String(swap.fromUser) ||
+          String(requestedShift.assignedTo) !== String(swap.toUser)
+        ) {
+          return res.status(409).json({
+            error: 'One of these shifts is no longer assigned to the requested trade participants',
+          });
         }
-
         offeredShift.assignedTo = swap.toUser;
         requestedShift.assignedTo = swap.fromUser;
         await Promise.all([offeredShift.save(), requestedShift.save()]);
         updatedShifts.push(offeredShift, requestedShift);
       } else {
-        // Support legacy requests created before counter-shifts were introduced.
         offeredShift.assignedTo = swap.toUser;
         await offeredShift.save();
         updatedShifts.push(offeredShift);

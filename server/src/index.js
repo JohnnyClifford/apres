@@ -21,7 +21,12 @@ async function start() {
   app.set('io', io);
 
   io.on('connection', (socket) => {
-    console.log(`[socket] user connected: ${socket.id}`);
+    socket.on('register', (userId) => {
+      if (userId) {
+        socket.join(`user:${userId}`);
+        console.log(`[socket] user ${userId} joined their private room`);
+      }
+    });
 
     socket.on('chat:message', async (data) => {
       try {
@@ -30,11 +35,15 @@ async function start() {
           recipient: data.recipientId || null,
           content: data.content,
         });
-
         await message.populate('sender', 'name role');
         await message.populate('recipient', 'name role');
 
-        io.emit('chat:message', message);
+        if (!message.recipient) {
+          io.emit('chat:message', message);
+        } else {
+          const roomIds = [message.sender._id.toString(), message.recipient._id.toString()];
+          roomIds.forEach((uid) => io.to(`user:${uid}`).emit('chat:message', message));
+        }
       } catch (err) {
         console.error('[socket] chat error:', err);
       }

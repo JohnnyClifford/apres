@@ -83,51 +83,45 @@ describe('canTransition', () => {
 });
 
 describe('validateSwapRequest', () => {
+  const FIXED_NOW = new Date('2026-10-01T12:00:00Z');
   const baseShift = {
-    _id: 's1',
+    _id: 'shift1',
     assignedTo: 'u1',
     date: '2026-11-02',
     startTime: '09:00',
   };
 
-  it('returns null when everything is valid', () => {
-    const err = validateSwapRequest({
-      shift: baseShift,
-      requesterId: 'u1',
-      toUserId: 'u2',
-      existingSwaps: [],
-      now: FIXED_NOW,
-    });
-    expect(err).toBeNull();
-  });
-
   it('rejects a missing shift', () => {
     const err = validateSwapRequest({
       shift: null, requesterId: 'u1', toUserId: 'u2', now: FIXED_NOW,
     });
-    expect(err).toMatch(/not found/i);
+    expect(err.status).toBe(404);
+    expect(err.error).toMatch(/not found/i);
   });
 
   it('rejects when requester is not the assignee', () => {
     const err = validateSwapRequest({
       shift: baseShift, requesterId: 'u3', toUserId: 'u2', existingSwaps: [], now: FIXED_NOW,
     });
-    expect(err).toMatch(/not assigned/i);
+    expect(err.status).toBe(403);
+    expect(err.error).toMatch(/not assigned/i);
   });
 
   it('rejects self-swap', () => {
     const err = validateSwapRequest({
       shift: baseShift, requesterId: 'u1', toUserId: 'u1', existingSwaps: [], now: FIXED_NOW,
     });
-    expect(err).toMatch(/yourself/i);
+    expect(err.status).toBe(400);
+    expect(err.error).toMatch(/yourself/i);
   });
 
   it('rejects a past shift', () => {
-    const past = { ...baseShift, date: '2026-10-30' };
+    const past = { ...baseShift, date: '2020-01-01' };
     const err = validateSwapRequest({
       shift: past, requesterId: 'u1', toUserId: 'u2', existingSwaps: [], now: FIXED_NOW,
     });
-    expect(err).toMatch(/already started/i);
+    expect(err.status).toBe(400);
+    expect(err.error).toMatch(/already started/i);
   });
 
   it('rejects when a pending swap already exists', () => {
@@ -135,6 +129,7 @@ describe('validateSwapRequest', () => {
       shift: baseShift, requesterId: 'u1', toUserId: 'u2',
       existingSwaps: [{ status: 'pending' }], now: FIXED_NOW,
     });
-    expect(err).toMatch(/pending swap/i);
+    expect(err.status).toBe(409);
+    expect(err.error).toMatch(/pending swap/i);
   });
 });

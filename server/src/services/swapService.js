@@ -29,11 +29,19 @@ function canTransition(fromStatus, toStatus) {
 }
 
 function validateSwapRequest({ shift, requesterId, toUserId, existingSwaps, now = new Date() }) {
-  if (!shift) return 'Shift not found';
-  if (!isRequesterAssigned(shift, requesterId)) return 'You are not assigned to this shift';
-  if (!areDistinctUsers(requesterId, toUserId)) return 'You cannot swap with yourself';
-  if (!isShiftInFuture(shift, now)) return 'Cannot swap a shift that has already started';
-  if (hasPendingSwap(existingSwaps)) return 'This shift already has a pending swap';
+  if (!shift) return { status: 404, error: 'Shift not found' };
+  if (!isRequesterAssigned(shift, requesterId)) {
+    return { status: 403, error: 'You are not assigned to this shift' };
+  }
+  if (!areDistinctUsers(requesterId, toUserId)) {
+    return { status: 400, error: 'You cannot swap with yourself' };
+  }
+  if (!isShiftInFuture(shift, now)) {
+    return { status: 400, error: 'Cannot swap a shift that has already started' };
+  }
+  if (hasPendingSwap(existingSwaps)) {
+    return { status: 409, error: 'This shift already has a pending swap' };
+  }
   return null;
 }
 
