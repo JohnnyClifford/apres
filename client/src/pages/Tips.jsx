@@ -16,6 +16,7 @@ export default function Tips() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [venueName, setVenueName] = useState('');
   
   const [users, setUsers] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -24,6 +25,18 @@ export default function Tips() {
 
   const isManager = user.role === 'manager' || user.role === 'owner';
   const isStaff = user.role === 'staff';
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await apiClient.get('/settings');
+        setVenueName(res.data.settings.venueName);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to load venue settings');
+      }
+    };
+    loadSettings();
+  }, []);
 
   useEffect(() => {
     if (!isManager) return;
@@ -64,6 +77,12 @@ export default function Tips() {
     setBreakdown(null);
     setCalculationInput(null);
     setSaveMessage('');
+
+    if (!venueName) {
+      setError('Venue settings are still loading. Please try again.');
+      return;
+    }
+
     setLoading(true);
 
     const shiftsForDate = shifts.filter(s => s.date === date && s.assignedTo);
@@ -83,13 +102,13 @@ export default function Tips() {
 
     try {
       const res = await apiClient.post('/tips/calculate', {
-        venue: 'Main Restaurant',
+        venue: venueName,
         totalTipsCents: Math.round(parseFloat(totalTips) * 100),
         shifts: shiftData
       });
       setBreakdown(res.data.distribution);
       setCalculationInput({
-        venue: 'Main Restaurant',
+        venue: venueName,
         date,
         totalTipsCents: Math.round(parseFloat(totalTips) * 100),
         shifts: shiftData,
@@ -102,7 +121,10 @@ export default function Tips() {
   };
 
   const handleSave = async () => {
-    if (!calculationInput) return;
+    if (!calculationInput || !venueName) {
+      if (!venueName) setError('Venue settings are still loading. Please try again.');
+      return;
+    }
     setError('');
     setSaveMessage('');
     setSaving(true);
@@ -172,7 +194,7 @@ export default function Tips() {
                   <button
                     type="button"
                     onClick={handleSave}
-                    disabled={!breakdown || saving}
+                    disabled={!breakdown || saving || !venueName}
                     className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Save Split'}
@@ -219,14 +241,25 @@ export default function Tips() {
                   if (!payout) return null;
 
                   return (
-                    <li key={distribution._id} className="flex justify-between items-center p-3 border rounded bg-gray-50">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-gray-800">{distribution.date}</span>
-                        <span className="text-sm text-gray-500">{distribution.venue}</span>
+                    <li key={distribution._id} className="p-3 border rounded bg-gray-50">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-gray-800">{distribution.date}</p>
+                          <p className="text-sm text-gray-500">{distribution.venue}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                            Pool: <span className="font-semibold">${(distribution.totalTipsCents / 100).toFixed(2)}</span>
+                                {payout.hours !== undefined && (
+                                    <>
+                                    {" · "}
+                                    <span className="font-semibold">{payout.hours}</span> hours worked
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                        <span className="font-bold text-lg text-green-600">
+                          ${(payout.amountCents / 100).toFixed(2)}
+                        </span>
                       </div>
-                      <span className="font-bold text-lg text-green-600">
-                        ${(payout.amountCents / 100).toFixed(2)}
-                      </span>
                     </li>
                   );
                 })}
@@ -234,7 +267,6 @@ export default function Tips() {
             )}
           </div>
         )}
-
       </div>
     </div>
   );

@@ -71,12 +71,17 @@ router.post('/distribute', requireRole('manager', 'owner'), async (req, res, nex
       distribution = calculateHours(totalTipsCents, shifts);
     }
 
+    const breakdownWithHours = distribution.map(dist => {
+      const matchingShift = shifts.find(s => s.userId === dist.userId);
+      return { ...dist, hours: matchingShift ? matchingShift.hours : 0 };
+    });
+
     const snapshot = await TipDistribution.create({
       venue,
       date,
       totalTipsCents,
       strategy,
-      breakdown: distribution,
+      breakdown: breakdownWithHours,
       createdBy: req.user.userId,
     });
 

@@ -25,9 +25,14 @@ export default function Dashboard() {
   const chatEndRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    venue: 'Main Restaurant', date: '', startTime: '17:00', endTime: '23:00', role: 'staff', assignedTo: '',
+    venue: '', date: '', startTime: '17:00', endTime: '23:00', role: 'staff', assignedTo: '',
   });
   const [formError, setFormError] = useState('');
+  const [venueName, setVenueName] = useState('');
+  const [venueInput, setVenueInput] = useState('');
+  const [venueMessage, setVenueMessage] = useState('');
+  const [venueError, setVenueError] = useState('');
+  const [savingVenue, setSavingVenue] = useState(false);
   
   const [swapShift, setSwapShift] = useState(null);
   const [swapTargetId, setSwapTargetId] = useState('');
@@ -72,12 +77,28 @@ export default function Dashboard() {
   }, [dispatch, user.role]);
 
   useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await apiClient.get('/settings');
+        const fetchedVenueName = res.data.settings.venueName;
+        setVenueName(fetchedVenueName);
+        setVenueInput(fetchedVenueName);
+        setFormData((current) => ({ ...current, venue: fetchedVenueName }));
+      } catch (err) {
+        setVenueError(err.response?.data?.error || 'Failed to load venue settings.');
+      }
+    };
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, chatTarget]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
   const isManager = user.role === 'manager' || user.role === 'owner';
   const isStaff = user.role === 'staff';
+  const isOwner = user.role === 'owner';
 
   const getId = (value) => (typeof value === 'object' && value !== null ? value._id : value)?.toString();
   const getUserName = (userId) => users.find(u => getId(u._id) === getId(userId))?.name || 'Assigned';
@@ -86,10 +107,38 @@ export default function Dashboard() {
   const handleCreateShift = async (e) => {
     e.preventDefault();
     setFormError('');
+    if (!venueName) {
+      setFormError('Venue settings are still loading. Please try again.');
+      return;
+    }
     try {
       await dispatch(createShift(formData)).unwrap();
       setFormData({ ...formData, date: '', assignedTo: '' });
     } catch (err) { setFormError(err); }
+  };
+
+  const handleSaveVenue = async (e) => {
+    e.preventDefault();
+    setVenueError('');
+    setVenueMessage('');
+    if (!venueInput.trim()) {
+      setVenueError('Venue name cannot be empty.');
+      return;
+    }
+
+    setSavingVenue(true);
+    try {
+      const res = await apiClient.put('/settings', { venueName: venueInput });
+      const savedVenueName = res.data.settings.venueName;
+      setVenueName(savedVenueName);
+      setVenueInput(savedVenueName);
+      setFormData((current) => ({ ...current, venue: savedVenueName }));
+      setVenueMessage('Venue settings saved successfully.');
+    } catch (err) {
+      setVenueError(err.response?.data?.error || 'Failed to save venue settings.');
+    } finally {
+      setSavingVenue(false);
+    }
   };
 
   const handleDeleteShift = async (id) => {
@@ -262,6 +311,29 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-8">
+            {isOwner && (
+              <div className="bg-white p-6 rounded-lg shadow h-fit">
+                <h2 className="text-xl font-bold mb-4 border-b pb-2">Venue Settings</h2>
+                {venueError && <p className="mb-3 rounded bg-red-100 p-2 text-sm text-red-700">{venueError}</p>}
+                {venueMessage && <p className="mb-3 rounded bg-green-100 p-2 text-sm text-green-700">{venueMessage}</p>}
+                <form onSubmit={handleSaveVenue} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="venueName">Venue name</label>
+                    <input
+                      id="venueName"
+                      type="text"
+                      value={venueInput}
+                      onChange={(e) => setVenueInput(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                  <button type="submit" disabled={savingVenue || !venueName} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded shadow disabled:opacity-50">
+                    {savingVenue ? 'Saving...' : 'Save'}
+                  </button>
+                </form>
+              </div>
+            )}
+
             {isManager && (
               <div className="bg-white p-6 rounded-lg shadow h-fit">
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Pending Swaps</h2>
@@ -296,7 +368,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {isManager && (
+            {isManager && venueName && (
               <div className="bg-white p-6 rounded-lg shadow h-fit">
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Add Shift</h2>
                 {formError && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-sm">{formError}</div>}
