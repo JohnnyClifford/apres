@@ -51,6 +51,7 @@ export default function Dashboard() {
     fetchChatHistory();
 
     socket.connect();
+    socket.emit('register', user.id || user._id); 
     
     const handleNewShift = (newShift) => dispatch(shiftReceivedViaSocket(newShift));
     const handleDeletedShift = (shiftId) => dispatch(shiftDeletedViaSocket(shiftId));
