@@ -37,9 +37,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     dispatch(fetchShifts());
-    if (user.role === 'manager' || user.role === 'owner') {
-      dispatch(fetchUsers());
-    }
+    dispatch(fetchUsers());
     dispatch(fetchSwaps());
 
     const fetchChatHistory = async () => {
@@ -161,7 +159,6 @@ export default function Dashboard() {
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
 
-  // Shifts available for the selected colleague (to trade for)
   const targetUserShifts = swapTargetId
     ? shifts.filter(s => getId(s.assignedTo) === swapTargetId)
     : [];
