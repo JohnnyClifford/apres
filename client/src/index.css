@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+
+@theme {
+  --color-forest-50: #f0f7f4;
+  --color-forest-100: #dcebe2;
+  --color-forest-500: #2d7a62;
+  --color-forest-600: #1e5f4f;
+  --color-forest-700: #164a3d;
+  --color-forest-900: #0d3328;
+  --color-ink-900: #1d1d1f;
+  --color-ink-600: #6e6e73;
+  --color-ink-400: #a1a1a6;
+  --color-cream-50: #fafaf9;
+  --color-cream-100: #f5f5f4;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+}
