@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import Hero from '../components/Hero';
+import Card from '../components/Card';
+import Button from '../components/Button';
 
 export default function Register() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
@@ -13,70 +16,94 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsSubmitting(true);
     try {
       await register(email, password, name);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message + ' - ' + (err.response?.data?.error || 'No server message'));
+      setError(err.response?.data?.error || 'Registration failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Create an Account</h2>
-        
-        {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">{error}</div>}
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700" htmlFor="register-name">Name</label>
-            <input 
-              id="register-name"
-              type="text" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-              required 
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700" htmlFor="register-email">Email</label>
-            <input 
-              id="register-email"
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              required 
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700" htmlFor="register-password">Password</label>
-            <input 
-              id="register-password"
-              type="password" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              required 
-              minLength={8} 
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-          >
-            {isSubmitting ? 'Creating account...' : 'Sign Up'}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Already have an account? <Link to="/login" className="text-blue-600 hover:underline">Login</Link>
-        </p>
+    <div className="min-h-screen bg-cream-50 p-6 md:p-8 flex items-center justify-center">
+      <div className="w-full max-w-md space-y-6">
+        <Hero eyebrow="Join the team" title="Après">
+          <p className="text-forest-100/90 text-sm">
+            Create your account to manage shifts and tips.
+          </p>
+        </Hero>
+
+        <Card className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 text-red-700 text-sm p-3 rounded-xl border border-red-100">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="register-name" className="block text-sm font-medium text-ink-900 mb-1.5">
+                Full name
+              </label>
+              <input
+                id="register-name"
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 border border-ink-400/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-500/30 focus:border-forest-500 text-ink-900 bg-white"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="register-email" className="block text-sm font-medium text-ink-900 mb-1.5">
+                Email
+              </label>
+              <input
+                id="register-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 border border-ink-400/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-500/30 focus:border-forest-500 text-ink-900 bg-white"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="register-password" className="block text-sm font-medium text-ink-900 mb-1.5">
+                Password
+              </label>
+              <input
+                id="register-password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 border border-ink-400/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-500/30 focus:border-forest-500 text-ink-900 bg-white"
+              />
+              <p className="text-xs text-ink-400 mt-1.5">Must be at least 8 characters</p>
+            </div>
+
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? 'Creating account...' : 'Create account'}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-ink-600 mt-6">
+            Already have an account?{' '}
+            <Link to="/login" className="text-forest-600 hover:text-forest-700 font-medium">
+              Log in
+            </Link>
+          </p>
+        </Card>
       </div>
     </div>
   );
