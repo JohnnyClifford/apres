@@ -31,7 +31,15 @@ router.post('/', requireRole('manager', 'owner'), async (req, res, next) => {
       return res.status(400).json({ error: 'venue, date, startTime, endTime are required' });
     }
 
-    const candidate = { venue, date, startTime, endTime, role, assignedTo, notes };
+    const candidate = {
+      venue,
+      date,
+      startTime,
+      endTime,
+      role,
+      assignedTo: assignedTo || null,
+      notes,
+    };
 
     if (assignedTo) {
       const sameVenue = await Shift.find({ venue, assignedTo });
@@ -81,7 +89,11 @@ router.patch('/:id', requireRole('manager', 'owner'), async (req, res, next) => 
     const shift = await Shift.findById(req.params.id);
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
 
-    Object.assign(shift, req.body || {});
+    const changes = { ...(req.body || {}) };
+    if (changes.assignedTo === '' || changes.assignedTo === undefined) {
+      changes.assignedTo = null;
+  }
+Object.assign(shift, changes);
 
     if (shift.assignedTo) {
       const sameVenue = await Shift.find({ venue: shift.venue, assignedTo: shift.assignedTo, _id: { $ne: shift._id } });

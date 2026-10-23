@@ -164,3 +164,20 @@ describe('DELETE /api/shifts/:id', () => {
     expect(get.body.shifts).toHaveLength(0);
   });
 });
+
+it('creates a shift with empty string assignedTo (regression)', async () => {
+  const { token } = await registerUser({ email: 'regr-unassigned@example.com', role: 'manager' });
+  const res = await request(app)
+    .post('/api/shifts')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      venue: 'Test Venue',
+      date: '2026-11-15',
+      startTime: '09:00',
+      endTime: '17:00',
+      role: 'staff',
+      assignedTo: '',
+    });
+  expect(res.status).toBe(201);
+  expect(res.body.shift.assignedTo).toBeFalsy();
+});
