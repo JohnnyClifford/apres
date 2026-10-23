@@ -264,10 +264,15 @@ export default function Tips() {
           <Card className="p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-ink-900">My Tip Payouts</h2>
-              <div className="flex gap-2 bg-cream-100 p-1 rounded-full">
-                <button onClick={() => setPayoutWeekOffset(o => o - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr;</button>
-                <button onClick={() => setPayoutWeekOffset(o => o + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&rarr;</button>
-              </div>
+                <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-ink-600">
+                    {formatWeekLabel(selectedPayoutWeekMonday)}
+                </span>
+                <div className="flex gap-1 bg-cream-100 p-1 rounded-full">
+                    <button onClick={() => setPayoutWeekOffset(o => o - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr;</button>
+                    <button onClick={() => setPayoutWeekOffset(o => o + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&rarr;</button>
+                </div>
+                </div>
             </div>
 
             {payoutLoading && <p className="text-ink-600 text-sm">Loading your payouts...</p>}
