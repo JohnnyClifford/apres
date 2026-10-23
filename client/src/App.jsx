@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Tips from './pages/Tips';
+import UserManagement from './pages/UserManagement';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -31,6 +32,14 @@ function AppRoutes() {
             <Tips />
           </ProtectedRoute>
         } 
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UserManagement />
+          </ProtectedRoute>
+        }
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

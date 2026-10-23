@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -62,6 +62,32 @@ router.get('/users', requireAuth, async (req, res, next) => {
   try {
     const users = await User.find().select('-passwordHash');
     res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/users/:id/role', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const { role } = req.body || {};
+    const allowedRoles = ['staff', 'manager', 'owner'];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    if (req.user.userId === req.params.id) {
+      return res.status(409).json({ error: 'You cannot change your own role' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true, runValidators: true }
+    ).select('-passwordHash');
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
   } catch (err) {
     next(err);
   }

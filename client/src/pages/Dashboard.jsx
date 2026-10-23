@@ -313,6 +313,15 @@ export default function Dashboard() {
           <div className="space-y-8">
             {isOwner && (
               <div className="bg-white p-6 rounded-lg shadow h-fit">
+                <h2 className="text-xl font-bold mb-4 border-b pb-2">Owner Controls</h2>
+                <Link to="/users" className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded shadow">
+                  Manage Users
+                </Link>
+              </div>
+            )}
+
+            {isOwner && (
+              <div className="bg-white p-6 rounded-lg shadow h-fit">
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Venue Settings</h2>
                 {venueError && <p className="mb-3 rounded bg-red-100 p-2 text-sm text-red-700">{venueError}</p>}
                 {venueMessage && <p className="mb-3 rounded bg-green-100 p-2 text-sm text-green-700">{venueMessage}</p>}

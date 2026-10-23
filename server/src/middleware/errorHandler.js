@@ -5,8 +5,8 @@ function notFound(req, res, next) {
 }
 
 function errorHandler(err, req, res, next) {
-  if (res.headersSent) {
-    return next(err);
+  if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    return res.status(400).json({ error: 'Invalid ID format' });
   }
 
   const status = err.status || 500;
@@ -19,6 +19,7 @@ function errorHandler(err, req, res, next) {
       console.error('[error]', err.stack || err);
     }
   }
+
   const message = isServerError
     ? 'Server error'
     : err.message || 'Request failed';
