@@ -8,7 +8,7 @@ import {
 } from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
-import { formatWeekLabel, getWeekStart } from '../utils/dateUtils';
+import { formatReadableDate, formatWeekLabel, getWeekStart } from '../utils/dateUtils';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -21,6 +21,13 @@ export default function Dashboard() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [ownerFilterActive, setOwnerFilterActive] = useState(false);
   const [shiftWeekOffset, setShiftWeekOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -318,6 +325,18 @@ export default function Dashboard() {
   const selectedWeekShifts = displayedShifts.filter((shift) => (
     shift.date >= selectedWeekMonday && shift.date <= selectedWeekSundayDate
   ));
+  const selectedDayShifts = displayedShifts.filter((shift) => shift.date === selectedDay);
+  const shiftsByRole = selectedDayShifts.reduce((groups, shift) => {
+    const role = shift.role || 'Unspecified role';
+    if (!groups[role]) groups[role] = [];
+    groups[role].push(shift);
+    return groups;
+  }, {});
+  const changeSelectedDay = (days) => {
+    const nextDay = new Date(`${selectedDay}T00:00:00`);
+    nextDay.setDate(nextDay.getDate() + days);
+    setSelectedDay(formatLocalDate(nextDay));
+  };
 
   useEffect(() => {
     const selectedWeekDate = new Date(`${selectedWeekMonday}T00:00:00`);
@@ -348,19 +367,22 @@ export default function Dashboard() {
               <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
                 <button onClick={() => setViewMode('list')} className={`px-3 py-1 text-sm font-medium rounded-md ${viewMode === 'list' ? 'bg-white shadow' : 'text-gray-500 hover:text-gray-800'}`}>List</button>
                 <button onClick={() => setViewMode('calendar')} className={`px-3 py-1 text-sm font-medium rounded-md ${viewMode === 'calendar' ? 'bg-white shadow' : 'text-gray-500 hover:text-gray-800'}`}>Calendar</button>
+                <button onClick={() => setViewMode('day')} className={`px-3 py-1 text-sm font-medium rounded-md ${viewMode === 'day' ? 'bg-white shadow' : 'text-gray-500 hover:text-gray-800'}`}>By Day</button>
               </div>
             </div>
 
             {loading && <p>Loading shifts...</p>}
             {error && <p className="text-red-500">{error}</p>}
 
-            <div className="flex items-center justify-between mb-4 bg-gray-50 p-2 rounded-lg border">
-              <button onClick={() => setShiftWeekOffset(o => o - 1)}>&larr; Prev Week</button>
-              <span>{formatWeekLabel(selectedWeekMonday)}</span>
-              <button onClick={() => setShiftWeekOffset(o => o + 1)}>Next Week &rarr;</button>
-            </div>
+            {viewMode !== 'day' && (
+              <div className="flex items-center justify-between mb-4 bg-gray-50 p-2 rounded-lg border">
+                <button onClick={() => setShiftWeekOffset(o => o - 1)}>&larr; Prev Week</button>
+                <span>{formatWeekLabel(selectedWeekMonday)}</span>
+                <button onClick={() => setShiftWeekOffset(o => o + 1)}>Next Week &rarr;</button>
+              </div>
+            )}
 
-            {!loading && selectedWeekShifts.length === 0 && (
+            {viewMode !== 'day' && !loading && selectedWeekShifts.length === 0 && (
               <p className="text-gray-500">No shifts scheduled for this week.</p>
             )}
 
@@ -372,7 +394,7 @@ export default function Dashboard() {
                   return (
                     <div key={shift._id} className={`border p-4 rounded flex justify-between items-center ${past ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
                       <div>
-                        <p className="font-bold text-lg">{shift.date} <span className="text-sm font-normal text-gray-500">at {shift.venue}</span></p>
+                        <p className="font-bold text-lg">{formatReadableDate(shift.date)} <span className="text-sm font-normal text-gray-500">at {shift.venue}</span></p>
                         <p className="text-gray-700">{shift.startTime} - {shift.endTime} ({shift.role})</p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -430,6 +452,39 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {viewMode === 'day' && (
+              <div>
+                <h3 className="font-bold text-lg mb-4">Roster for {formatReadableDate(selectedDay)}</h3>
+                <div className="flex items-center justify-between mb-4 bg-gray-50 p-2 rounded-lg border">
+                  <button onClick={() => changeSelectedDay(-1)}>&larr; Prev Day</button>
+                  <span>{formatReadableDate(selectedDay)}</span>
+                  <button onClick={() => changeSelectedDay(1)}>Next Day &rarr;</button>
+                </div>
+
+                {!loading && selectedDayShifts.length === 0 && (
+                  <p className="text-gray-500">No shifts scheduled for {formatReadableDate(selectedDay)}.</p>
+                )}
+
+                {Object.entries(shiftsByRole).map(([role, roleShifts]) => (
+                  <section key={role}>
+                    <div className="flex items-center gap-2 font-semibold text-lg border-b pb-1 mb-2 mt-4">
+                      <h4>{role}</h4>
+                      {roleShifts.some((shift) => !shift.assignedTo) && (
+                        <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">⚠️ UNASSIGNED SHIFT</span>
+                      )}
+                    </div>
+                    <ul className="space-y-2">
+                      {roleShifts.map((shift) => (
+                        <li key={shift._id} className="flex justify-between items-center p-3 border rounded bg-gray-50">
+                          <span>{shift.startTime} - {shift.endTime}: {shift.assignedTo ? getUserName(shift.assignedTo) : 'Unassigned'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </div>
             )}
           </div>
@@ -497,10 +552,10 @@ export default function Dashboard() {
                         <div key={swap._id} className="border rounded p-3 text-sm">
                           <p className="font-semibold">{getUserName(swap.fromUser)} ⇄ {getUserName(swap.toUser)}</p>
                           <p className="text-gray-500 mt-1">
-                            Gives: {offered ? `${offered.date} ${offered.startTime}–${offered.endTime}` : '—'}
+                            Gives: {offered ? `${formatReadableDate(offered.date)} ${offered.startTime}–${offered.endTime}` : '—'}
                           </p>
                           <p className="text-gray-500">
-                            Wants: {requested ? `${requested.date} ${requested.startTime}–${requested.endTime}` : '—'}
+                            Wants: {requested ? `${formatReadableDate(requested.date)} ${requested.startTime}–${requested.endTime}` : '—'}
                           </p>
                           <div className="flex gap-2 mt-3">
                             <button onClick={() => handleResolveSwap(swap._id, 'accepted')} disabled={resolvingSwapId === swap._id} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded disabled:opacity-50">{resolvingSwapId === swap._id ? 'Approving...' : 'Approve'}</button>
@@ -584,7 +639,7 @@ export default function Dashboard() {
           <form onSubmit={handleRequestSwap} className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
             <h2 className="text-xl font-bold">Request a shift trade</h2>
             <p className="text-sm text-gray-600 mt-2">
-              You give: <strong>{swapShift.date} {swapShift.startTime}–{swapShift.endTime}</strong>
+              You give: <strong>{formatReadableDate(swapShift.date)} {swapShift.startTime}–{swapShift.endTime}</strong>
             </p>
             {swapError && <p className="mt-3 rounded bg-red-100 p-2 text-sm text-red-700">{swapError}</p>}
 
@@ -622,7 +677,7 @@ export default function Dashboard() {
                     <option value="">Select one of their shifts</option>
                     {targetUserShifts.map((s) => (
                       <option key={s._id} value={s._id}>
-                        {s.date} {s.startTime}–{s.endTime}
+                        {formatReadableDate(s.date)} {s.startTime}–{s.endTime}
                       </option>
                     ))}
                   </select>

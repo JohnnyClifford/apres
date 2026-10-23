@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { fetchShifts } from '../features/shiftsSlice';
-import { formatWeekLabel, getWeekStart } from '../utils/dateUtils';
+import { formatReadableDate, formatWeekLabel, getWeekStart } from '../utils/dateUtils';
 
 export default function Tips() {
   const { user } = useAuth();
@@ -216,7 +216,7 @@ export default function Tips() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="" disabled>Select a date...</option>
-                      {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
+                      {uniqueDates.map(d => <option key={d} value={d}>{formatReadableDate(d)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -254,6 +254,7 @@ export default function Tips() {
             {breakdown && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Payout Breakdown</h2>
+                {calculationInput?.date && <p className="mb-4 text-gray-600">{formatReadableDate(calculationInput.date)}</p>}
                 <ul className="space-y-3">
                   {breakdown.map((item) => (
                     <li key={item.userId} className="flex justify-between items-center p-3 border rounded bg-gray-50">
@@ -297,7 +298,7 @@ export default function Tips() {
                     <li key={distribution._id} className="p-3 border rounded bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-800">{distribution.date}</p>
+                          <p className="font-medium text-gray-800">{formatReadableDate(distribution.date)}</p>
                           <p className="text-sm text-gray-500">{distribution.venue}</p>
                             <p className="text-xs text-gray-500 mt-1">
                             Pool: <span className="font-semibold">${(distribution.totalTipsCents / 100).toFixed(2)}</span>

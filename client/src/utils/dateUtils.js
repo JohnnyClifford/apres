@@ -21,3 +21,16 @@ export const formatWeekLabel = (mondayDateString) => {
     year: 'numeric',
   })}`;
 };
+
+export const formatReadableDate = (dateString) => {
+  const date = new Date(`${dateString}T00:00:00`);
+  const day = date.getDate();
+  const lastTwoDigits = day % 100;
+  const suffix = lastTwoDigits >= 11 && lastTwoDigits <= 13
+    ? 'th'
+    : ({ 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] || 'th');
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
+  const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+
+  return `${weekday} ${day}${suffix} ${month} ${date.getFullYear()}`;
+};
