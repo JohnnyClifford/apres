@@ -32,6 +32,18 @@ export const deleteShift = createAsyncThunk('shifts/deleteShift', async (id, { r
   }
 });
 
+export const updateShift = createAsyncThunk('shifts/updateShift', async ({ id, changes }, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.patch(`/shifts/${id}`, changes);
+    return res.data.shift;
+  } catch (err) {
+    return rejectWithValue({
+      error: err.response?.data?.error || 'Failed to update shift',
+      conflictId: err.response?.data?.conflictId,
+    });
+  }
+});
+
 export const fetchUsers = createAsyncThunk('shifts/fetchUsers', async (_, { rejectWithValue }) => {
   try {
     const res = await apiClient.get('/auth/users');
@@ -100,6 +112,10 @@ const shiftsSlice = createSlice({
       })
       .addCase(deleteShift.fulfilled, (state, action) => {
         state.list = state.list.filter(s => s._id !== action.payload);
+      })
+      .addCase(updateShift.fulfilled, (state, action) => {
+        const index = state.list.findIndex((s) => s._id === action.payload._id);
+        if (index !== -1) state.list[index] = action.payload;
       })
       .addCase(fetchUsers.fulfilled, (state, action) => { state.users = action.payload; })
       .addCase(fetchSwaps.fulfilled, (state, action) => { state.swaps = action.payload; });

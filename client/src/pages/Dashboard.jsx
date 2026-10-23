@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  fetchShifts, createShift, fetchUsers, fetchSwaps, deleteShift,
+  fetchShifts, createShift, fetchUsers, fetchSwaps, deleteShift, updateShift,
   shiftReceivedViaSocket, shiftDeletedViaSocket, swapReceivedViaSocket,
   subscribeToSwapEvents, socket
 } from '../features/shiftsSlice';
@@ -39,6 +39,13 @@ export default function Dashboard() {
   const [swapRequestedShiftId, setSwapRequestedShiftId] = useState('');
   const [swapError, setSwapError] = useState('');
   const [submittingSwap, setSubmittingSwap] = useState(false);
+
+  const [editingShift, setEditingShift] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    venue: '', date: '', startTime: '', endTime: '', role: '', assignedTo: '',
+  });
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     dispatch(fetchShifts());
@@ -144,6 +151,38 @@ export default function Dashboard() {
   const handleDeleteShift = async (id) => {
     if (window.confirm('Are you sure you want to delete this shift?')) {
       await dispatch(deleteShift(id));
+    }
+  };
+
+  const openEditShift = (shift) => {
+    setEditingShift(shift);
+    setEditFormData({
+      venue: shift.venue || '',
+      date: shift.date || '',
+      startTime: shift.startTime || '',
+      endTime: shift.endTime || '',
+      role: shift.role || '',
+      assignedTo: getId(shift.assignedTo) || '',
+    });
+    setEditError('');
+  };
+
+  const handleEditFieldChange = (field, value) => {
+    setEditFormData((current) => ({ ...current, [field]: value }));
+    setEditError('');
+  };
+
+  const handleUpdateShift = async (e) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      await dispatch(updateShift({ id: editingShift._id, changes: editFormData })).unwrap();
+      setEditingShift(null);
+    } catch (err) {
+      setEditError(err?.error || err || 'Failed to update shift.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -261,7 +300,10 @@ export default function Dashboard() {
                           <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Unassigned</span>
                         )}
                         {isManager && (
-                          <button onClick={() => handleDeleteShift(shift._id)} className="text-red-500 hover:text-red-700 text-sm font-bold px-2" title="Delete Shift">✕</button>
+                          <>
+                            <button onClick={() => openEditShift(shift)} className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2" title="Edit Shift">Edit</button>
+                            <button onClick={() => handleDeleteShift(shift._id)} className="text-red-500 hover:text-red-700 text-sm font-bold px-2" title="Delete Shift">✕</button>
+                          </>
                         )}
                         {isMyShift && !past && (
                           <button onClick={() => openSwapRequest(shift)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1 rounded">Request Swap</button>
@@ -494,6 +536,50 @@ export default function Dashboard() {
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setSwapShift(null)} disabled={submittingSwap} className="px-4 py-2 rounded border">Cancel</button>
               <button type="submit" disabled={submittingSwap || !swapRequestedShiftId} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-4 py-2 rounded">{submittingSwap ? 'Sending…' : 'Send Request'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-shift-title">
+          <form onSubmit={handleUpdateShift} className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
+            <h2 id="edit-shift-title" className="text-xl font-bold">Edit shift</h2>
+            {editError && <p className="mt-3 rounded bg-red-100 p-2 text-sm text-red-700">{editError}</p>}
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Venue</label>
+              <input type="text" value={editFormData.venue} readOnly className="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100 text-gray-600" />
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Date</label>
+              <input type="date" required value={editFormData.date} onChange={(e) => handleEditFieldChange('date', e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Start</label>
+                <input type="time" required value={editFormData.startTime} onChange={(e) => handleEditFieldChange('startTime', e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">End</label>
+                <input type="time" required value={editFormData.endTime} onChange={(e) => handleEditFieldChange('endTime', e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-md" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Role</label>
+              <input type="text" required value={editFormData.role} onChange={(e) => handleEditFieldChange('role', e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Assign To</label>
+              <select value={editFormData.assignedTo} onChange={(e) => handleEditFieldChange('assignedTo', e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-md">
+                <option value="">-- Leave Unassigned --</option>
+                {users.map((member) => <option key={member._id} value={member._id}>{member.name} ({member.role})</option>)}
+              </select>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setEditingShift(null)} disabled={savingEdit} className="px-4 py-2 rounded border disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={savingEdit} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded">{savingEdit ? 'Saving...' : 'Save'}</button>
             </div>
           </form>
         </div>
