@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { fetchShifts } from '../features/shiftsSlice';
+import { formatWeekLabel, getWeekStart } from '../utils/dateUtils';
 
 export default function Tips() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export default function Tips() {
   const [payouts, setPayouts] = useState([]);
   const [payoutError, setPayoutError] = useState('');
   const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutWeekOffset, setPayoutWeekOffset] = useState(0);
 
   const isManager = user.role === 'manager' || user.role === 'owner';
   const isStaff = user.role === 'staff';
@@ -94,6 +96,24 @@ export default function Tips() {
   const uniqueDates = [...new Set(shifts.map(s => s.date))].sort();
   const shiftsForSelectedDate = shifts.filter((shift) => shift.date === date);
   const getUserName = (userId) => users.find(u => u._id === userId)?.name || 'Unknown User';
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const getSelectedPayoutWeekMonday = (offset) => {
+    const currentMonday = new Date(`${getWeekStart(formatLocalDate(new Date()))}T00:00:00`);
+    currentMonday.setDate(currentMonday.getDate() + offset * 7);
+    return formatLocalDate(currentMonday);
+  };
+  const selectedPayoutWeekMonday = getSelectedPayoutWeekMonday(payoutWeekOffset);
+  const selectedPayoutWeekSunday = new Date(`${selectedPayoutWeekMonday}T00:00:00`);
+  selectedPayoutWeekSunday.setDate(selectedPayoutWeekSunday.getDate() + 6);
+  const selectedPayoutWeekSundayDate = formatLocalDate(selectedPayoutWeekSunday);
+  const selectedWeekPayouts = payouts.filter((distribution) => (
+    distribution.date >= selectedPayoutWeekMonday && distribution.date <= selectedPayoutWeekSundayDate
+  ));
 
   const handleCalculate = async (e) => {
     e.preventDefault();
@@ -253,16 +273,21 @@ export default function Tips() {
         {isStaff && (
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4 border-b pb-2">My Tip Payouts</h2>
+            <div className="flex items-center justify-between mb-4 bg-gray-50 p-2 rounded-lg border">
+              <button onClick={() => setPayoutWeekOffset(o => o - 1)}>&larr; Prev Week</button>
+              <span>{formatWeekLabel(selectedPayoutWeekMonday)}</span>
+              <button onClick={() => setPayoutWeekOffset(o => o + 1)}>Next Week &rarr;</button>
+            </div>
             {payoutLoading && <p className="text-gray-600">Loading your payouts...</p>}
             {payoutError && <p className="text-red-700">{payoutError}</p>}
             
-            {!payoutLoading && !payoutError && payouts.length === 0 && (
-              <p className="text-gray-600">No tip payouts have been saved for you yet.</p>
+            {!payoutLoading && !payoutError && selectedWeekPayouts.length === 0 && (
+              <p className="text-gray-600">No tip payouts recorded for this week.</p>
             )}
             
-            {!payoutLoading && !payoutError && payouts.length > 0 && (
+            {!payoutLoading && !payoutError && selectedWeekPayouts.length > 0 && (
               <ul className="space-y-3">
-                {payouts.map((distribution) => {
+                {selectedWeekPayouts.map((distribution) => {
                   const payout = distribution.breakdown.find(
                     (item) => String(item.userId) === String(user.id || user._id)
                   );

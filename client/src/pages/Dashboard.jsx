@@ -8,6 +8,7 @@ import {
 } from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
+import { formatWeekLabel, getWeekStart } from '../utils/dateUtils';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [ownerFilterActive, setOwnerFilterActive] = useState(false);
+  const [shiftWeekOffset, setShiftWeekOffset] = useState(0);
   
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -304,6 +306,23 @@ export default function Dashboard() {
     && shift.date <= sevenDaysFromTodayDate
   ));
   const displayedShifts = ownerFilterActive ? upcomingUnassignedShifts : shifts;
+  const getSelectedWeekMonday = (offset) => {
+    const currentMonday = new Date(`${getWeekStart(formatLocalDate(new Date()))}T00:00:00`);
+    currentMonday.setDate(currentMonday.getDate() + offset * 7);
+    return formatLocalDate(currentMonday);
+  };
+  const selectedWeekMonday = getSelectedWeekMonday(shiftWeekOffset);
+  const selectedWeekSunday = new Date(`${selectedWeekMonday}T00:00:00`);
+  selectedWeekSunday.setDate(selectedWeekSunday.getDate() + 6);
+  const selectedWeekSundayDate = formatLocalDate(selectedWeekSunday);
+  const selectedWeekShifts = displayedShifts.filter((shift) => (
+    shift.date >= selectedWeekMonday && shift.date <= selectedWeekSundayDate
+  ));
+
+  useEffect(() => {
+    const selectedWeekDate = new Date(`${selectedWeekMonday}T00:00:00`);
+    setCurrentMonth(new Date(selectedWeekDate.getFullYear(), selectedWeekDate.getMonth(), 1));
+  }, [selectedWeekMonday]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -335,10 +354,19 @@ export default function Dashboard() {
             {loading && <p>Loading shifts...</p>}
             {error && <p className="text-red-500">{error}</p>}
 
+            <div className="flex items-center justify-between mb-4 bg-gray-50 p-2 rounded-lg border">
+              <button onClick={() => setShiftWeekOffset(o => o - 1)}>&larr; Prev Week</button>
+              <span>{formatWeekLabel(selectedWeekMonday)}</span>
+              <button onClick={() => setShiftWeekOffset(o => o + 1)}>Next Week &rarr;</button>
+            </div>
+
+            {!loading && selectedWeekShifts.length === 0 && (
+              <p className="text-gray-500">No shifts scheduled for this week.</p>
+            )}
+
             {viewMode === 'list' && (
               <div className="space-y-4">
-                {displayedShifts.length === 0 && <p className="text-gray-500">No shifts scheduled yet.</p>}
-                {displayedShifts.map(shift => {
+                {selectedWeekShifts.map(shift => {
                   const past = isPastShift(shift.date);
                   const isMyShift = getId(shift.assignedTo) === getId(user.id || user._id);
                   return (
@@ -383,7 +411,7 @@ export default function Dashboard() {
                   {calendarDays.map((day, idx) => {
                     if (!day) return <div key={`empty-${idx}`} className="h-24 bg-gray-50 rounded p-1"></div>;
                     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const dayShifts = displayedShifts.filter(s => s.date === dateStr);
+                    const dayShifts = selectedWeekShifts.filter(s => s.date === dateStr);
                     const isToday = dateStr === new Date().toISOString().split('T')[0];
                     return (
                       <div key={day} className={`h-24 border rounded p-1 overflow-y-auto text-sm ${isToday ? 'border-blue-500 bg-blue-50' : 'bg-white'}`}>
