@@ -35,6 +35,7 @@ export default function Dashboard() {
   });
   const [shiftWeekOffset, setShiftWeekOffset] = useState(0);
   const [ownerFilterActive, setOwnerFilterActive] = useState(false);
+  const [assigneeFilter, setAssigneeFilter] = useState(() => user.role === 'staff' ? 'me' : 'all');
 
   const [formData, setFormData] = useState({
     venue: '', date: '', startTime: '17:00', endTime: '23:00', role: 'staff', assignedTo: '',
@@ -149,6 +150,11 @@ export default function Dashboard() {
     !shift.assignedTo && shift.date >= todayDate && shift.date <= sevenDaysFromTodayDate
   ));
   const displayedShifts = ownerFilterActive ? upcomingUnassignedShifts : shifts;
+  const filteredShifts = displayedShifts.filter(s => {
+    if (assigneeFilter === 'all') return true;
+    const targetId = assigneeFilter === 'me' ? (user.id || user._id) : assigneeFilter;
+    return getId(s.assignedTo) === String(targetId);
+  });
 
   const getSelectedWeekMonday = (offset) => {
     const currentMonday = new Date(`${getWeekStart(formatLocalDate(new Date()))}T00:00:00`);
@@ -159,11 +165,11 @@ export default function Dashboard() {
   const selectedWeekSunday = new Date(`${selectedWeekMonday}T00:00:00`);
   selectedWeekSunday.setDate(selectedWeekSunday.getDate() + 6);
   const selectedWeekSundayDate = formatLocalDate(selectedWeekSunday);
-  const selectedWeekShifts = displayedShifts.filter((shift) => (
+  const selectedWeekShifts = filteredShifts.filter((shift) => (
     shift.date >= selectedWeekMonday && shift.date <= selectedWeekSundayDate
   ));
 
-  const selectedDayShifts = displayedShifts.filter((shift) => shift.date === selectedDay);
+  const selectedDayShifts = filteredShifts.filter((shift) => shift.date === selectedDay);
   const shiftsByRole = selectedDayShifts.reduce((groups, shift) => {
     const role = shift.role || 'Unspecified role';
     if (!groups[role]) groups[role] = [];
@@ -324,9 +330,27 @@ export default function Dashboard() {
           {/* --- LEFT COLUMN: SHIFTS PANEL --- */}
           <Card className="md:col-span-2 p-6 md:p-8">
 
-            {/* View Toggle */}
-            <div className="flex justify-between items-center mb-4 border-b pb-2">
+            {/* Shift Filters & View Toggle */}
+            <div className="mb-4 border-b pb-2">
               <h2 className="text-xl font-bold text-ink-900">Shifts</h2>
+              {isStaff && (
+                <div className="flex gap-2 mb-3">
+                  <button onClick={() => setAssigneeFilter('me')} className={`px-3 py-1 text-sm rounded-full ${assigneeFilter === 'me' ? 'bg-forest-600 text-white' : 'bg-cream-100 text-ink-600'}`}>My shifts</button>
+                  <button onClick={() => setAssigneeFilter('all')} className={`px-3 py-1 text-sm rounded-full ${assigneeFilter === 'all' ? 'bg-forest-600 text-white' : 'bg-cream-100 text-ink-600'}`}>Everyone</button>
+                </div>
+              )}
+              {isManager && (
+                <div className="mb-3">
+                  <select
+                    value={assigneeFilter}
+                    onChange={(e) => setAssigneeFilter(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-ink-400/30 rounded-xl bg-white"
+                  >
+                    <option value="all">All staff</option>
+                    {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="flex gap-2 bg-cream-100 p-1 rounded-full">
                 {['list', 'calendar', 'day'].map(mode => (
                   <button key={mode} onClick={() => setViewMode(mode)} className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${viewMode === mode ? 'bg-white shadow text-forest-700' : 'text-ink-600 hover:text-ink-900'}`}>
@@ -351,7 +375,11 @@ export default function Dashboard() {
             {/* List View */}
             {viewMode === 'list' && (
               <div className="space-y-3">
-                {selectedWeekShifts.length === 0 && <p className="text-ink-600">No shifts scheduled for this week.</p>}
+                {selectedWeekShifts.length === 0 && (
+                  <p className="text-ink-600">
+                    {filteredShifts.length < displayedShifts.length ? 'No shifts match this filter.' : 'No shifts scheduled for this week.'}
+                  </p>
+                )}
                 {selectedWeekShifts.map(shift => {
                   const past = isPastShift(shift.date);
                   const isMyShift = getId(shift.assignedTo) === getId(user.id || user._id);
