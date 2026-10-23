@@ -18,6 +18,7 @@ export default function Dashboard() {
 
   const [viewMode, setViewMode] = useState('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [ownerFilterActive, setOwnerFilterActive] = useState(false);
   
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -288,6 +289,21 @@ export default function Dashboard() {
   const targetUserShifts = swapTargetId
     ? shifts.filter(s => getId(s.assignedTo) === swapTargetId)
     : [];
+  const formatLocalDate = (date) => {
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    return offsetDate.toISOString().split('T')[0];
+  };
+  const today = new Date();
+  const sevenDaysFromToday = new Date(today);
+  sevenDaysFromToday.setDate(today.getDate() + 7);
+  const todayDate = formatLocalDate(today);
+  const sevenDaysFromTodayDate = formatLocalDate(sevenDaysFromToday);
+  const upcomingUnassignedShifts = shifts.filter((shift) => (
+    !shift.assignedTo
+    && shift.date >= todayDate
+    && shift.date <= sevenDaysFromTodayDate
+  ));
+  const displayedShifts = ownerFilterActive ? upcomingUnassignedShifts : shifts;
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -321,8 +337,8 @@ export default function Dashboard() {
 
             {viewMode === 'list' && (
               <div className="space-y-4">
-                {shifts.length === 0 && <p className="text-gray-500">No shifts scheduled yet.</p>}
-                {shifts.map(shift => {
+                {displayedShifts.length === 0 && <p className="text-gray-500">No shifts scheduled yet.</p>}
+                {displayedShifts.map(shift => {
                   const past = isPastShift(shift.date);
                   const isMyShift = getId(shift.assignedTo) === getId(user.id || user._id);
                   return (
@@ -367,7 +383,7 @@ export default function Dashboard() {
                   {calendarDays.map((day, idx) => {
                     if (!day) return <div key={`empty-${idx}`} className="h-24 bg-gray-50 rounded p-1"></div>;
                     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const dayShifts = shifts.filter(s => s.date === dateStr);
+                    const dayShifts = displayedShifts.filter(s => s.date === dateStr);
                     const isToday = dateStr === new Date().toISOString().split('T')[0];
                     return (
                       <div key={day} className={`h-24 border rounded p-1 overflow-y-auto text-sm ${isToday ? 'border-blue-500 bg-blue-50' : 'bg-white'}`}>
@@ -397,6 +413,19 @@ export default function Dashboard() {
                 <Link to="/users" className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded shadow">
                   Manage Users
                 </Link>
+              </div>
+            )}
+
+            {isOwner && upcomingUnassignedShifts.length > 0 && (
+              <div className="bg-red-50 border border-red-300 rounded-lg p-4 shadow">
+                <h2 className="text-red-800 font-bold">Coverage Alert</h2>
+                <p className="mt-2 text-red-800">⚠️ {upcomingUnassignedShifts.length} unassigned shift(s) in the next 7 days.</p>
+                <button
+                  onClick={() => setOwnerFilterActive((active) => !active)}
+                  className={`mt-3 px-4 py-2 rounded text-white font-medium ${ownerFilterActive ? 'bg-gray-600 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700'}`}
+                >
+                  {ownerFilterActive ? 'Show all shifts' : 'Show only unassigned'}
+                </button>
               </div>
             )}
 
