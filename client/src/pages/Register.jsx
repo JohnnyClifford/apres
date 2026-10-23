@@ -7,16 +7,20 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await register(email, password, name);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message + ' - ' + (err.response?.data?.error || 'No server message'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -29,8 +33,9 @@ export default function Register() {
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="register-name">Name</label>
             <input 
+              id="register-name"
               type="text" 
               value={name} 
               onChange={e => setName(e.target.value)} 
@@ -39,8 +44,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="register-email">Email</label>
             <input 
+              id="register-email"
               type="email" 
               value={email} 
               onChange={e => setEmail(e.target.value)} 
@@ -49,8 +55,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="register-password">Password</label>
             <input 
+              id="register-password"
               type="password" 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
@@ -61,9 +68,10 @@ export default function Register() {
           </div>
           <button 
             type="submit" 
+            disabled={isSubmitting}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
           >
-            Sign Up
+            {isSubmitting ? 'Creating account...' : 'Sign Up'}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-600">

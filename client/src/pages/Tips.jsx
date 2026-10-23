@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
+import { fetchShifts } from '../features/shiftsSlice';
 
 export default function Tips() {
   const { user } = useAuth();
+  const dispatch = useDispatch();
   const { list: shifts } = useSelector((state) => state.shifts);
   
   const [date, setDate] = useState('');
@@ -17,6 +19,8 @@ export default function Tips() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [venueName, setVenueName] = useState('');
+  const [shiftLoading, setShiftLoading] = useState(false);
+  const [shiftError, setShiftError] = useState('');
   
   const [users, setUsers] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -25,6 +29,25 @@ export default function Tips() {
 
   const isManager = user.role === 'manager' || user.role === 'owner';
   const isStaff = user.role === 'staff';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadShifts = async () => {
+      setShiftLoading(true);
+      setShiftError('');
+      try {
+        await dispatch(fetchShifts()).unwrap();
+      } catch (err) {
+        if (isMounted) setShiftError(err || 'Failed to load shifts.');
+      } finally {
+        if (isMounted) setShiftLoading(false);
+      }
+    };
+
+    loadShifts();
+    return () => { isMounted = false; };
+  }, [dispatch]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -69,6 +92,7 @@ export default function Tips() {
   }, [isStaff]);
 
   const uniqueDates = [...new Set(shifts.map(s => s.date))].sort();
+  const shiftsForSelectedDate = shifts.filter((shift) => shift.date === date);
   const getUserName = (userId) => users.find(u => u._id === userId)?.name || 'Unknown User';
 
   const handleCalculate = async (e) => {
@@ -156,13 +180,16 @@ export default function Tips() {
           <>
             <div className="bg-white p-6 rounded-lg shadow">
               {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+              {shiftLoading && <div className="bg-gray-100 text-gray-700 p-3 rounded mb-4">Loading shifts...</div>}
+              {shiftError && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{shiftError}</div>}
               {saveMessage && <div className="bg-green-100 text-green-700 p-3 rounded mb-4">{saveMessage}</div>}
               
               <form onSubmit={handleCalculate} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Shift Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="tip-shift-date">Select Shift Date</label>
                     <select 
+                      id="tip-shift-date"
                       value={date} 
                       onChange={(e) => setDate(e.target.value)}
                       required
@@ -173,8 +200,9 @@ export default function Tips() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Tips Collected ($)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="tip-total">Total Tips Collected ($)</label>
                     <input 
+                      id="tip-total"
                       type="number" step="0.01" min="0" required
                       value={totalTips} 
                       onChange={(e) => setTotalTips(e.target.value)}
@@ -186,7 +214,7 @@ export default function Tips() {
                 <div className="flex flex-wrap gap-3">
                   <button 
                     type="submit" 
-                    disabled={loading}
+                    disabled={loading || shiftLoading || shiftsForSelectedDate.length === 0}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded shadow disabled:opacity-50"
                   >
                     {loading ? 'Calculating...' : 'Calculate Split'}

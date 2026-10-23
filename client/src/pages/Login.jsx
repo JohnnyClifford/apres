@@ -6,16 +6,20 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message + ' - ' + (err.response?.data?.error || 'No server message'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -28,8 +32,9 @@ export default function Login() {
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="login-email">Email</label>
             <input 
+              id="login-email"
               type="email" 
               value={email} 
               onChange={e => setEmail(e.target.value)} 
@@ -38,8 +43,9 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="login-password">Password</label>
             <input 
+              id="login-password"
               type="password" 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
@@ -49,9 +55,10 @@ export default function Login() {
           </div>
           <button 
             type="submit" 
+            disabled={isSubmitting}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
           >
-            Log In
+            {isSubmitting ? 'Logging in...' : 'Log In'}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-600">
