@@ -1,118 +1,94 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import apiClient from '../api/client';
 import { useAuth } from '../context/AuthContext';
-
-const roles = ['staff', 'manager', 'owner'];
+import apiClient from '../api/client';
+import Hero from '../components/Hero';
+import Card from '../components/Card';
 
 export default function UserManagement() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [savingUserId, setSavingUserId] = useState('');
-  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    if (user.role !== 'owner') {
-      setLoading(false);
-      return;
-    }
+    apiClient.get('/auth/users')
+      .then(res => setUsers(res.data.users))
+      .catch(err => setError(err.response?.data?.error || 'Failed to load users'));
+  }, []);
 
-    async function loadUsers() {
-      setLoading(true);
-      setError('');
-      try {
-        const response = await apiClient.get('/auth/users');
-        setUsers(response.data.users);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to load users.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadUsers();
-  }, [user.role]);
-
-  const getId = (value) => (value?.id || value?._id || value)?.toString();
-
-  const handleRoleChange = async (targetUser, role) => {
-    const targetUserId = getId(targetUser);
-    setSavingUserId(targetUserId);
-    setSaveError('');
-    setSuccessMessage('');
-
+  const handleRoleChange = async (id, role) => {
+    setSaving(id); setError(''); setSuccessMessage('');
     try {
-      const response = await apiClient.patch(`/auth/users/${targetUserId}/role`, { role });
-      const updatedUser = response.data.user;
-      setUsers((currentUsers) => currentUsers.map((currentUser) => (
-        getId(currentUser) === targetUserId ? updatedUser : currentUser
-      )));
-      setSuccessMessage(`${updatedUser.name}'s role was updated to ${updatedUser.role}.`);
+      const res = await apiClient.patch(`/auth/users/${id}/role`, { role });
+      setUsers(prev => prev.map(u => u._id === id ? res.data.user : u));
+      setSuccessMessage(`Role updated to ${role}.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      setSaveError(err.response?.data?.error || 'Failed to save the role change.');
-    } finally {
-      setSavingUserId('');
-    }
+      setError(err.response?.data?.error || 'Failed to update role');
+    } finally { setSaving(null); }
   };
 
   if (user.role !== 'owner') {
-    return <p className="p-8">Only owners can access this page.</p>;
+    return <div className="min-h-screen bg-cream-50 p-8 text-center text-ink-600">Only owners can access this page.</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-          <Link to="/dashboard" className="text-blue-600 hover:text-blue-800 font-medium">Back to Dashboard</Link>
-        </div>
+    <div className="min-h-screen bg-cream-50 p-6 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-8">
 
-        {loading && <p>Loading users...</p>}
-        {error && <p className="rounded bg-red-100 p-3 text-red-700">{error}</p>}
-        {saveError && <p className="mb-4 rounded bg-red-100 p-3 text-red-700">{saveError}</p>}
-        {successMessage && <p className="mb-4 rounded bg-green-100 p-3 text-green-700">{successMessage}</p>}
-
-        {!loading && !error && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="border-b text-sm text-gray-600">
-                <tr>
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((listedUser) => {
-                  const listedUserId = getId(listedUser);
-                  const isCurrentUser = listedUserId === getId(user);
-                  const isSaving = savingUserId === listedUserId;
-                  return (
-                    <tr key={listedUserId} className="border-b">
-                      <td className="p-3">{listedUser.name}</td>
-                      <td className="p-3">{listedUser.email}</td>
-                      <td className="p-3">
-                        <select
-                          value={listedUser.role}
-                          disabled={isCurrentUser || isSaving}
-                          onChange={(event) => handleRoleChange(listedUser, event.target.value)}
-                          className="border rounded px-3 py-2 disabled:opacity-50"
-                          aria-label={`Role for ${listedUser.name}`}
-                        >
-                          {roles.map((role) => <option key={role} value={role}>{role}</option>)}
-                        </select>
-                        {isSaving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <Hero eyebrow="Owner" title="Manage Users">
+          <p className="text-forest-100/90 text-sm">Promote staff, adjust roles, and manage access.</p>
+          <div className="mt-4">
+            <Link to="/settings" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium text-sm transition-colors">
+              &larr; Back to Settings
+            </Link>
           </div>
-        )}
+        </Hero>
+
+        {error && <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm border border-red-100">{error}</div>}
+        {successMessage && <div className="bg-forest-50 text-forest-700 p-4 rounded-2xl text-sm border border-forest-100">{successMessage}</div>}
+
+        <Card className="p-0 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-cream-100">
+              <tr>
+                <th className="text-left p-4 font-medium text-ink-600 text-xs uppercase tracking-wider">Name</th>
+                <th className="text-left p-4 font-medium text-ink-600 text-xs uppercase tracking-wider">Email</th>
+                <th className="text-left p-4 font-medium text-ink-600 text-xs uppercase tracking-wider">Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 && (
+                <tr><td colSpan={3} className="p-8 text-center text-ink-600 text-sm">No users found.</td></tr>
+              )}
+              {users.map(u => {
+                const isSelf = u._id === (user.id || user._id);
+                return (
+                  <tr key={u._id} className="border-t border-ink-400/10">
+                    <td className="p-4 text-ink-900 font-medium">{u.name}</td>
+                    <td className="p-4 text-sm text-ink-600">{u.email}</td>
+                    <td className="p-4">
+                      <select
+                        value={u.role}
+                        onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                        disabled={saving === u._id || isSelf}
+                        title={isSelf ? 'You cannot change your own role' : ''}
+                        className="px-3 py-1.5 border border-ink-400/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="staff">Staff</option>
+                        <option value="manager">Manager</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+
       </div>
     </div>
   );
