@@ -162,6 +162,8 @@ export default function Dashboard() {
     return formatLocalDate(currentMonday);
   };
   const selectedWeekMonday = getSelectedWeekMonday(shiftWeekOffset);
+  const currentWeekMonday = getSelectedWeekMonday(0);
+  const isViewingCurrentWeek = selectedWeekMonday === currentWeekMonday;
   const selectedWeekSunday = new Date(`${selectedWeekMonday}T00:00:00`);
   selectedWeekSunday.setDate(selectedWeekSunday.getDate() + 6);
   const selectedWeekSundayDate = formatLocalDate(selectedWeekSunday);
@@ -170,6 +172,7 @@ export default function Dashboard() {
   ));
 
   const selectedDayShifts = filteredShifts.filter((shift) => shift.date === selectedDay);
+  const isViewingToday = selectedDay === formatLocalDate(new Date());
   const shiftsByRole = selectedDayShifts.reduce((groups, shift) => {
     const role = shift.role || 'Unspecified role';
     if (!groups[role]) groups[role] = [];
@@ -186,6 +189,8 @@ export default function Dashboard() {
   for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const isViewingCurrentMonth = currentMonth.getFullYear() === new Date().getFullYear()
+    && currentMonth.getMonth() === new Date().getMonth();
   const changeSelectedDay = (days) => {
     const nextDay = new Date(`${selectedDay}T00:00:00`);
     nextDay.setDate(nextDay.getDate() + days);
@@ -379,10 +384,17 @@ export default function Dashboard() {
             {error && <p className="text-red-500">{error}</p>}
 
             {/* Week Navigation */}
-            {viewMode !== 'day' && (
+            {viewMode === 'list' && (
               <div className="flex items-center justify-between mb-4 bg-cream-100 p-2 rounded-2xl border border-ink-400/10">
                 <button onClick={() => setShiftWeekOffset(o => o - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr; Prev Week</button>
-                <span className="font-medium text-ink-900">{formatWeekLabel(selectedWeekMonday)}</span>
+                <div className="flex flex-col items-center">
+                  <span className="font-medium text-ink-900">{formatWeekLabel(selectedWeekMonday)}</span>
+                  {!isViewingCurrentWeek && (
+                    <button onClick={() => setShiftWeekOffset(0)} className="mt-1 text-xs text-forest-600 underline underline-offset-2 hover:text-forest-700">
+                      &larr; Back to current week
+                    </button>
+                  )}
+                </div>
                 <button onClick={() => setShiftWeekOffset(o => o + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">Next Week &rarr;</button>
               </div>
             )}
@@ -431,7 +443,14 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <button onClick={prevMonth} className="px-3 py-1 bg-cream-100 rounded-full text-sm">&larr;</button>
-                  <h3 className="font-bold text-ink-900">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                  <div className="flex flex-col items-center">
+                    <h3 className="font-bold text-ink-900">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                    {!isViewingCurrentMonth && (
+                      <button onClick={() => setCurrentMonth(new Date())} className="mt-1 text-xs text-forest-600 underline underline-offset-2 hover:text-forest-700">
+                        &larr; Back to {new Date().toLocaleString('default', { month: 'long' })}
+                      </button>
+                    )}
+                  </div>
                   <button onClick={nextMonth} className="px-3 py-1 bg-cream-100 rounded-full text-sm">&rarr;</button>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center mb-2 font-medium text-ink-400 text-xs uppercase tracking-wider">
@@ -463,7 +482,14 @@ export default function Dashboard() {
               <div>
                 <div className="flex items-center justify-between mb-4 bg-cream-100 p-2 rounded-2xl border border-ink-400/10">
                   <button onClick={() => changeSelectedDay(-1)} className="px-3 py-1 text-sm font-medium text-forest-600">&larr; Prev</button>
-                  <span className="font-medium text-ink-900">{formatReadableDate(selectedDay)}</span>
+                  <div className="flex flex-col items-center">
+                    <span className="font-medium text-ink-900">{formatReadableDate(selectedDay)}</span>
+                    {!isViewingToday && (
+                      <button onClick={() => setSelectedDay(formatLocalDate(new Date()))} className="mt-1 text-xs text-forest-600 underline underline-offset-2 hover:text-forest-700">
+                        &larr; Back to today
+                      </button>
+                    )}
+                  </div>
                   <button onClick={() => changeSelectedDay(1)} className="px-3 py-1 text-sm font-medium text-forest-600">Next &rarr;</button>
                 </div>
                 {selectedDayShifts.length === 0 && <p className="text-ink-600">No shifts scheduled for {formatReadableDate(selectedDay)}.</p>}
