@@ -304,9 +304,14 @@ export default function Dashboard() {
         <Hero eyebrow={`Welcome, ${user.name} (${user.role})`} title="Dashboard">
           <div className="flex flex-wrap gap-3">
             {isManager && (
-              <Link to="/tips" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
-                Tip Calculator
-              </Link>
+              <>
+                <Link to="/tips" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+                  Tip Calculator
+                </Link>
+                <Link to="/time-off-approvals" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+                  Time Off Approvals
+                </Link>
+              </>
             )}
             {isStaff && (
               <Link to="/tips" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
@@ -314,9 +319,14 @@ export default function Dashboard() {
               </Link>
             )}
             {isStaff && (
-              <Link to="/availability" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
-                My Time Off
-              </Link>
+              <>
+                <Link to="/weekly-availability" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+                  My Unavailability
+                </Link>
+                <Link to="/time-off" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+                  Time Off Requests
+                </Link>
+              </>
             )}
             {isOwner && (
               <Link to="/settings" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">

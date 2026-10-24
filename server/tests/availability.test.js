@@ -283,3 +283,57 @@ describe('availability submission status', () => {
     expect(res.body.availabilities[0].status).toBe('approved');
   });
 });
+
+describe('DELETE /api/availability/:id', () => {
+  it('staff can delete their own pending time off', async () => {
+    const staff = await registerStaff('delete-own@example.com');
+    const created = await request(app)
+      .put('/api/availability/me')
+      .set('Authorization', `Bearer ${staff.token}`)
+      .send({ weekStart: WEEK, slots: SLOTS });
+
+    const deleted = await request(app)
+      .delete(`/api/availability/${created.body.availability._id}`)
+      .set('Authorization', `Bearer ${staff.token}`);
+    const fetched = await request(app)
+      .get(`/api/availability/me?weekStart=${WEEK}`)
+      .set('Authorization', `Bearer ${staff.token}`);
+
+    expect(deleted.status).toBe(204);
+    expect(fetched.body.availability).toBeNull();
+  });
+
+  it('staff cannot delete approved time off', async () => {
+    const staff = await registerStaff('delete-approved-staff@example.com');
+    const manager = await registerManager('delete-approved-manager@example.com');
+    const created = await request(app)
+      .put('/api/availability/me')
+      .set('Authorization', `Bearer ${staff.token}`)
+      .send({ weekStart: WEEK, slots: SLOTS });
+
+    await request(app)
+      .patch(`/api/availability/${created.body.availability._id}/status`)
+      .set('Authorization', `Bearer ${manager.token}`)
+      .send({ status: 'approved' });
+    const deleted = await request(app)
+      .delete(`/api/availability/${created.body.availability._id}`)
+      .set('Authorization', `Bearer ${staff.token}`);
+
+    expect(deleted.status).toBe(409);
+  });
+
+  it("staff cannot delete another user's time off", async () => {
+    const alice = await registerStaff('delete-alice@example.com');
+    const bob = await registerStaff('delete-bob@example.com');
+    const created = await request(app)
+      .put('/api/availability/me')
+      .set('Authorization', `Bearer ${alice.token}`)
+      .send({ weekStart: WEEK, slots: SLOTS });
+
+    const deleted = await request(app)
+      .delete(`/api/availability/${created.body.availability._id}`)
+      .set('Authorization', `Bearer ${bob.token}`);
+
+    expect(deleted.status).toBe(403);
+  });
+});

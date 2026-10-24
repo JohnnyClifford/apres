@@ -80,6 +80,15 @@ export const saveMyAvailability = createAsyncThunk('shifts/saveMyAvailability', 
   }
 });
 
+export const deleteMyAvailability = createAsyncThunk('shifts/deleteMyAvailability', async (id, { rejectWithValue }) => {
+  try {
+    await apiClient.delete(`/availability/${id}`);
+    return id;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to delete availability');
+  }
+});
+
 export const fetchMyWeeklyAvailability = createAsyncThunk('shifts/fetchMyWeeklyAvailability', async (_, { rejectWithValue }) => {
   try {
     const res = await apiClient.get('/weekly-availability/me');
@@ -157,6 +166,7 @@ const shiftsSlice = createSlice({
       .addCase(fetchSwaps.fulfilled, (state, action) => { state.swaps = action.payload; })
       .addCase(fetchMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
       .addCase(saveMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
+      .addCase(deleteMyAvailability.fulfilled, (state) => { state.myAvailability = null; })
       .addCase(fetchMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; })
       .addCase(saveMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; });
   },

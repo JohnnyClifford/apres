@@ -2,78 +2,58 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchMyAvailability, saveMyAvailability } from '../features/shiftsSlice';
-import { formatWeekLabel, getWeekStart } from '../utils/dateUtils';
+import { deleteMyAvailability, fetchMyAvailability, saveMyAvailability } from '../features/shiftsSlice';
+import { formatReadableDate, formatWeekLabel, getWeekStart } from '../utils/dateUtils';
 import Hero from '../components/Hero';
 import Card from '../components/Card';
-
-const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
-const QUARTERS = ['00', '15', '30', '45'];
-const DEFAULT_RANGE = {
-  start: { h: '09', m: '00' },
-  end: { h: '17', m: '00' },
-};
 
 const formatLocalDate = (date) => {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
   return offsetDate.toISOString().split('T')[0];
 };
 
-const getWeekDates = (weekStart) => Array.from({ length: 7 }, (_, dayOffset) => {
+const getWeekDates = (weekStart, today) => Array.from({ length: 7 }, (_, dayOffset) => {
   const date = new Date(`${weekStart}T00:00:00`);
   date.setDate(date.getDate() + dayOffset);
-  return formatLocalDate(date);
+
+  return {
+    dateStr: formatLocalDate(date),
+    dayName: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date),
+    dayNum: date.getDate(),
+    isPast: formatLocalDate(date) < today,
+  };
 });
 
-const splitTime = (time) => {
-  const [h = '00', m = '00'] = time.split(':');
-  return { h, m };
+const getStatusBadge = (status) => {
+  if (status === 'pending') return { label: '⏳ Pending manager approval', shortLabel: '⏳ Pending', className: 'border border-amber-200 bg-amber-50 text-amber-700' };
+  if (status === 'approved') return { label: '✓ Approved', shortLabel: '✓ Approved', className: 'border border-forest-200 bg-forest-50 text-forest-700' };
+  if (status === 'rejected') return { label: '✗ Rejected — you can edit and resubmit', shortLabel: '✗ Rejected', className: 'border border-red-200 bg-red-50 text-red-700' };
+  return null;
 };
-
-const toMinutes = (time) => Number(time.h) * 60 + Number(time.m);
-
-const formatDayLabel = (dateString) => {
-  const date = new Date(`${dateString}T00:00:00`);
-  const day = date.getDate();
-  const lastTwoDigits = day % 100;
-  const suffix = lastTwoDigits >= 11 && lastTwoDigits <= 13
-    ? 'th'
-    : ({ 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] || 'th');
-  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
-  const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(date);
-  return `${weekday} ${day}${suffix} ${month}`;
-};
-
-function TimeSelects({ label, time, onChange, disabled }) {
-  return (
-    <div className="flex items-center gap-1">
-      <span className="text-sm text-ink-600">{label}</span>
-      <select disabled={disabled} aria-label={`${label} hour`} value={time.h} onChange={(event) => onChange('h', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm disabled:opacity-60">
-        {HOURS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}
-      </select>
-      <span className="text-ink-400">:</span>
-      <select disabled={disabled} aria-label={`${label} minutes`} value={time.m} onChange={(event) => onChange('m', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm disabled:opacity-60">
-        {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
-      </select>
-    </div>
-  );
-}
 
 export default function Availability() {
   const { user } = useAuth();
   const dispatch = useDispatch();
   const [weekOffset, setWeekOffset] = useState(0);
+  const today = formatLocalDate(new Date());
   const weekStart = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + weekOffset * 7);
-    return getWeekStart(formatLocalDate(date));
-  }, [weekOffset]);
-  const [ranges, setRanges] = useState({});
-  const [loading, setLoading] = useState(false);
+    const week = new Date(`${getWeekStart(today)}T00:00:00`);
+    week.setDate(week.getDate() + weekOffset * 7);
+    return formatLocalDate(week);
+  }, [today, weekOffset]);
+  const [selectedDates, setSelectedDates] = useState(new Set());
+  const [availabilityId, setAvailabilityId] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [status, setStatus] = useState(null);
+
+  const weekDates = useMemo(() => getWeekDates(weekStart, today), [weekStart, today]);
+  const statusBadge = getStatusBadge(status);
+  const isApproved = status === 'approved';
 
   useEffect(() => {
     if (user.role !== 'staff') return undefined;
@@ -82,33 +62,27 @@ export default function Availability() {
     setLoading(true);
     setError('');
     setSuccessMsg('');
+    setAvailabilityId(null);
+    setSlots([]);
     setStatus(null);
+    setSelectedDates(new Set());
 
     dispatch(fetchMyAvailability(weekStart))
       .unwrap()
       .then((availability) => {
         if (!isCurrentRequest) return;
-
-        const weekDates = new Set(getWeekDates(weekStart));
-        const loadedRanges = (availability?.slots || []).reduce((groupedRanges, slot) => {
-          if (!weekDates.has(slot.date)) return groupedRanges;
-          if (!groupedRanges[slot.date]) groupedRanges[slot.date] = [];
-          groupedRanges[slot.date].push({
-            start: splitTime(slot.startTime),
-            end: splitTime(slot.endTime),
-          });
-          return groupedRanges;
-        }, {});
-
-        setRanges(loadedRanges);
+        setSelectedDates(new Set((availability?.slots || []).map((slot) => slot.date)));
+        setAvailabilityId(availability?._id || null);
+        setSlots(availability?.slots || []);
         setStatus(availability?.status || null);
       })
       .catch((message) => {
-        if (isCurrentRequest) {
-          setRanges({});
-          setStatus(null);
-          setError(message);
-        }
+        if (!isCurrentRequest) return;
+        setSelectedDates(new Set());
+        setAvailabilityId(null);
+        setSlots([]);
+        setStatus(null);
+        setError(message);
       })
       .finally(() => {
         if (isCurrentRequest) setLoading(false);
@@ -117,61 +91,39 @@ export default function Availability() {
     return () => { isCurrentRequest = false; };
   }, [dispatch, user.role, weekStart]);
 
-  const addRange = (date) => {
-    setRanges((currentRanges) => ({
-      ...currentRanges,
-      [date]: [...(currentRanges[date] || []), {
-        start: { ...DEFAULT_RANGE.start },
-        end: { ...DEFAULT_RANGE.end },
-      }],
-    }));
-    setSuccessMsg('');
-  };
+  const toggleDate = (dateStr, isPast) => {
+    if (isPast || isApproved) return;
 
-  const deleteRange = (date, index) => {
-    setRanges((currentRanges) => ({
-      ...currentRanges,
-      [date]: currentRanges[date].filter((_, rangeIndex) => rangeIndex !== index),
-    }));
-    setSuccessMsg('');
-  };
-
-  const updateRange = (date, index, boundary, part, value) => {
-    setRanges((currentRanges) => ({
-      ...currentRanges,
-      [date]: currentRanges[date].map((range, rangeIndex) => (
-        rangeIndex === index
-          ? { ...range, [boundary]: { ...range[boundary], [part]: value } }
-          : range
-      )),
-    }));
+    setSelectedDates((currentDates) => {
+      const nextDates = new Set(currentDates);
+      if (nextDates.has(dateStr)) nextDates.delete(dateStr);
+      else nextDates.add(dateStr);
+      return nextDates;
+    });
+    setError('');
     setSuccessMsg('');
   };
 
   const handleSave = async () => {
-    if (status === 'approved') return;
+    if (isApproved || selectedDates.size === 0) return;
 
-    const slots = getWeekDates(weekStart).flatMap((date) => (
-      (ranges[date] || []).map((range) => ({
-        date,
-        startTime: `${range.start.h}:${range.start.m}`,
-        endTime: `${range.end.h}:${range.end.m}`,
-      }))
-    ));
-
-    if (Object.values(ranges).flat().some((range) => toMinutes(range.end) <= toMinutes(range.start))) {
-      setError('End time must be after start time');
-      setSuccessMsg('');
-      return;
-    }
+    const slots = Array.from(selectedDates).map((date) => ({
+      date,
+      startTime: '00:00',
+      endTime: '23:59',
+    }));
+    const previousStatus = status;
 
     setSaving(true);
     setError('');
     setSuccessMsg('');
     try {
-      await dispatch(saveMyAvailability({ weekStart, slots })).unwrap();
-      setSuccessMsg('Time off saved');
+      const availability = await dispatch(saveMyAvailability({ weekStart, slots })).unwrap();
+      setAvailabilityId(availability._id);
+      setSlots(availability.slots);
       setStatus('pending');
+      setSuccessMsg('Time off request submitted');
+      if (previousStatus === 'pending' || previousStatus === null) setSelectedDates(new Set());
     } catch (message) {
       setError(message);
     } finally {
@@ -179,94 +131,140 @@ export default function Availability() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this time off request?')) return;
+
+    setDeleting(true);
+    setError('');
+    try {
+      await dispatch(deleteMyAvailability(id)).unwrap();
+      setAvailabilityId(null);
+      setSlots([]);
+      setStatus(null);
+      setSelectedDates(new Set());
+    } catch (message) {
+      setError(message || 'Failed to delete request');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (user.role !== 'staff') {
     return (
       <div className="min-h-screen bg-cream-50 p-6 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          <Hero eyebrow="Staff — Time Off" title="My Time Off">
+        <div className="mx-auto max-w-6xl">
+          <Hero eyebrow="Staff" title="Time Off Requests">
             <div className="space-y-4">
-              <p className="text-forest-100">Mark the dates and times you cannot work — the manager will schedule around them.</p>
-              <Link to="/dashboard" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+              <p className="text-forest-100">Select the dates you need off. Your manager will approve or reject each request.</p>
+              <Link to="/dashboard" className="inline-flex items-center rounded-full bg-white/10 px-5 py-2 font-medium text-white transition-colors hover:bg-white/20">
                 &larr; Back to Dashboard
               </Link>
             </div>
           </Hero>
-          <Card className="p-8 mt-8">
-            <p className="text-ink-600">Availability is set by staff members.</p>
+          <Card className="mt-8 p-8">
+            <p className="text-ink-600">Time off is requested by staff members.</p>
           </Card>
         </div>
       </div>
     );
   }
 
-  const isApproved = status === 'approved';
-  const statusBadge = status === 'pending'
-    ? { label: '⏳ Pending manager approval', className: 'bg-amber-50 text-amber-700' }
-    : status === 'approved'
-      ? { label: '✓ Approved', className: 'bg-forest-50 text-forest-700' }
-      : status === 'rejected'
-        ? { label: '✗ Rejected — edit and resubmit', className: 'bg-red-50 text-red-700' }
-        : { label: 'Not yet submitted', className: 'bg-gray-100 text-gray-600' };
-
   return (
     <div className="min-h-screen bg-cream-50 p-6 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <Hero eyebrow="Staff — Time Off" title="My Time Off">
+      <div className="mx-auto max-w-6xl">
+        <Hero eyebrow="Staff" title="Time Off Requests">
           <div className="space-y-4">
-            <p className="text-forest-100">Mark the dates and times you cannot work — the manager will schedule around them.</p>
-            <Link to="/dashboard" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+            <p className="text-forest-100">Select the dates you need off. Your manager will approve or reject each request.</p>
+            <Link to="/dashboard" className="inline-flex items-center rounded-full bg-white/10 px-5 py-2 font-medium text-white transition-colors hover:bg-white/20">
               &larr; Back to Dashboard
             </Link>
           </div>
         </Hero>
 
-        <Card className="p-8 mt-8">
-          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${statusBadge.className}`}>{statusBadge.label}</span>
-          <div className="mt-6 flex items-center justify-between bg-cream-100 p-2 rounded-2xl border border-ink-400/10">
-            <button onClick={() => setWeekOffset((offset) => offset - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr; Prev Week</button>
-            <span className="font-medium text-ink-900">{formatWeekLabel(weekStart)}</span>
-            <button onClick={() => setWeekOffset((offset) => offset + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">Next Week &rarr;</button>
+        <div className="mb-6 mt-8 flex items-center justify-between rounded-2xl border border-ink-400/10 bg-cream-100 p-3">
+          <button type="button" onClick={() => setWeekOffset((offset) => offset - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr; Prev Week</button>
+          <span className="font-medium text-ink-900">{formatWeekLabel(weekStart)}</span>
+          <button type="button" onClick={() => setWeekOffset((offset) => offset + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">Next Week &rarr;</button>
+        </div>
+
+        <Card className="p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold text-ink-900">Select dates</h2>
+            {statusBadge && <span className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${statusBadge.className}`}>{statusBadge.label}</span>}
           </div>
 
-          <div className="mt-6">
-          {loading && <p className="mb-4 text-sm text-ink-600">Loading availability...</p>}
-          {error && <p className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</p>}
-          {successMsg && <p className="mb-4 rounded-xl bg-forest-50 border border-forest-200 p-3 text-sm text-forest-700">{successMsg}</p>}
-          {!loading && Object.values(ranges).every((dayRanges) => dayRanges.length === 0) && (
-            <p className="mb-4 text-sm text-ink-600">You have no time off marked — you're available for all shifts by default.</p>
-          )}
-
-          <div className="space-y-4">
-            {getWeekDates(weekStart).map((date) => (
-              <section key={date} className="rounded-2xl border border-ink-400/15 bg-white p-4">
-                <h2 className="font-semibold text-ink-900">{formatDayLabel(date)}</h2>
-                <div className="mt-3 space-y-2">
-                  {(ranges[date] || []).map((range, index) => (
-                    <div key={`${date}-${index}`} className="flex flex-wrap items-center gap-2 rounded-2xl bg-cream-50 p-3">
-                      <TimeSelects label="Start" time={range.start} disabled={isApproved} onChange={(part, value) => updateRange(date, index, 'start', part, value)} />
-                      <span className="text-sm text-ink-600">to</span>
-                      <TimeSelects label="End" time={range.end} disabled={isApproved} onChange={(part, value) => updateRange(date, index, 'end', part, value)} />
-                      {!isApproved && <button type="button" onClick={() => deleteRange(date, index)} className="ml-auto rounded-full px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50" aria-label={`Delete range ${index + 1} for ${formatDayLabel(date)}`}>✕</button>}
-                    </div>
-                  ))}
-                </div>
-                {!isApproved && <button type="button" onClick={() => addRange(date)} className="mt-3 rounded-full bg-forest-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-forest-700">+ Add time off</button>}
-              </section>
-            ))}
-          </div>
-
-          {isApproved ? (
-            <div className="mt-6 rounded-xl bg-forest-50 border border-forest-200 p-4 text-sm text-forest-800">
-              Your time off is approved. To request changes, contact your manager.
-            </div>
+          {loading ? (
+            <p className="mt-6 text-sm text-ink-600">Loading time off request...</p>
           ) : (
-            <div className="mt-6 flex justify-end">
-              <button onClick={handleSave} disabled={saving} className="rounded-full bg-forest-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-forest-700 disabled:opacity-50">
-                {saving ? 'Saving...' : 'Save time off'}
-              </button>
+            <>
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                {weekDates.map(({ dateStr, dayName, dayNum, isPast }) => {
+                  const isSelected = selectedDates.has(dateStr);
+                  const isDisabled = isPast || isApproved;
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => toggleDate(dateStr, isPast)}
+                      className={`aspect-square rounded-2xl p-4 text-center transition-colors ${isSelected ? 'bg-forest-600 text-white hover:bg-forest-700' : 'border border-ink-400/30 bg-white text-ink-900 hover:bg-cream-50'} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <span className="block text-sm font-medium">{dayName}</span>
+                      <span className="mt-1 block text-3xl font-bold">{dayNum}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {isApproved && <p className="mt-4 text-sm text-forest-700">Your time off is approved.</p>}
+              {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+              {successMsg && <p className="mt-4 rounded-xl bg-forest-50 p-3 text-sm text-forest-700">{successMsg}</p>}
+
+              <div className="mt-6 flex justify-end">
+                <button type="button" onClick={handleSave} disabled={selectedDates.size === 0 || isApproved || saving} className="rounded-full bg-forest-600 px-5 py-2 font-medium text-white transition-colors hover:bg-forest-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  {saving ? 'Submitting...' : 'Submit request'}
+                </button>
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="mt-6 p-6">
+          <h2 className="mb-4 text-xl font-bold text-ink-900">My requests for this week</h2>
+
+          {loading && <p className="text-sm text-ink-600">Loading...</p>}
+
+          {!loading && !availabilityId && (
+            <p className="text-sm text-ink-600">No request submitted for this week.</p>
+          )}
+
+          {!loading && availabilityId && (
+            <div className="rounded-2xl border border-ink-400/15 p-4">
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium text-ink-900">{formatWeekLabel(weekStart)}</p>
+                  <p className="mt-1 text-sm text-ink-600">{slots.length} date{slots.length !== 1 ? 's' : ''} requested</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {statusBadge && <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusBadge.className}`}>{statusBadge.shortLabel}</span>}
+                  {status !== 'approved' && (
+                    <button type="button" onClick={() => handleDelete(availabilityId)} disabled={deleting} className="px-2 text-lg font-bold text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" title="Delete request">
+                      {deleting ? '...' : '✕'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <ul className="mt-2 space-y-1 text-sm text-ink-600">
+                {slots.map((slot, index) => (
+                  <li key={`${slot.date}-${index}`} className="flex items-center gap-2">
+                    <span className="text-forest-600">•</span>
+                    <span className="font-medium text-ink-900">{formatReadableDate(slot.date)}</span>
+                    <span className="text-ink-400">(all day)</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-          </div>
         </Card>
       </div>
     </div>

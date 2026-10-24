@@ -37,13 +37,14 @@ function AppRoutes() {
         } 
       />
       <Route
-        path="/availability"
+        path="/time-off"
         element={
           <ProtectedRoute>
             <Availability />
           </ProtectedRoute>
         }
       />
+      <Route path="/availability" element={<Navigate to="/time-off" replace />} />
       <Route
         path="/weekly-availability"
         element={

@@ -68,6 +68,26 @@ router.get('/week', requireAuth, requireRole('manager', 'owner'), async (req, re
   }
 });
 
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const availability = await Availability.findById(req.params.id);
+    if (!availability) return res.status(404).json({ error: 'Availability not found' });
+
+    if (String(availability.user) !== String(req.user.userId)) {
+      return res.status(403).json({ error: 'You can only delete your own availability' });
+    }
+
+    if (availability.status === 'approved') {
+      return res.status(409).json({ error: 'Approved time off cannot be cancelled directly. Contact your manager.' });
+    }
+
+    await Availability.findByIdAndDelete(req.params.id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/:id/status', requireAuth, requireRole('manager', 'owner'), async (req, res, next) => {
   try {
     const { status } = req.body || {};
