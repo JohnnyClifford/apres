@@ -80,6 +80,24 @@ export const saveMyAvailability = createAsyncThunk('shifts/saveMyAvailability', 
   }
 });
 
+export const fetchMyWeeklyAvailability = createAsyncThunk('shifts/fetchMyWeeklyAvailability', async (_, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.get('/weekly-availability/me');
+    return res.data.weeklyAvailability;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to fetch weekly availability');
+  }
+});
+
+export const saveMyWeeklyAvailability = createAsyncThunk('shifts/saveMyWeeklyAvailability', async ({ slots }, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.put('/weekly-availability/me', { slots });
+    return res.data.weeklyAvailability;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to save weekly availability');
+  }
+});
+
 export function subscribeToSwapEvents(dispatch) {
   const refreshSwaps = () => dispatch(fetchSwaps());
   socket.on('swap:requested', refreshSwaps);
@@ -93,7 +111,7 @@ export function subscribeToSwapEvents(dispatch) {
 
 const shiftsSlice = createSlice({
   name: 'shifts',
-  initialState: { list: [], users: [], swaps: [], myAvailability: null, loading: false, error: null },
+  initialState: { list: [], users: [], swaps: [], myAvailability: null, myWeeklyAvailability: null, loading: false, error: null },
   reducers: {
     shiftReceivedViaSocket: (state, action) => {
       const index = state.list.findIndex((s) => s._id === action.payload._id);
@@ -138,7 +156,9 @@ const shiftsSlice = createSlice({
       .addCase(fetchUsers.fulfilled, (state, action) => { state.users = action.payload; })
       .addCase(fetchSwaps.fulfilled, (state, action) => { state.swaps = action.payload; })
       .addCase(fetchMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
-      .addCase(saveMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; });
+      .addCase(saveMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
+      .addCase(fetchMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; })
+      .addCase(saveMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; });
   },
 });
 

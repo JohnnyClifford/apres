@@ -7,6 +7,7 @@ import Tips from './pages/Tips';
 import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
 import Availability from './pages/Availability';
+import WeeklyAvailability from './pages/WeeklyAvailability';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -40,6 +41,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Availability />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/weekly-availability"
+        element={
+          <ProtectedRoute>
+            <WeeklyAvailability />
           </ProtectedRoute>
         }
       />
