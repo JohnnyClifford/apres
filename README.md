@@ -10,7 +10,7 @@ A full-stack web application for hospitality shift scheduling, team communicatio
 
 ---
 
-##  Reviewer Note (Read This First)
+##  Reviewer Note
 
 **Please log in via the root URL and navigate using the in-app buttons.**
 
