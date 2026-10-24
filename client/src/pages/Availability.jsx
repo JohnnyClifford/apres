@@ -44,15 +44,15 @@ const formatDayLabel = (dateString) => {
   return `${weekday} ${day}${suffix} ${month}`;
 };
 
-function TimeSelects({ label, time, onChange }) {
+function TimeSelects({ label, time, onChange, disabled }) {
   return (
     <div className="flex items-center gap-1">
       <span className="text-sm text-ink-600">{label}</span>
-      <select aria-label={`${label} hour`} value={time.h} onChange={(event) => onChange('h', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm">
+      <select disabled={disabled} aria-label={`${label} hour`} value={time.h} onChange={(event) => onChange('h', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm disabled:opacity-60">
         {HOURS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}
       </select>
       <span className="text-ink-400">:</span>
-      <select aria-label={`${label} minutes`} value={time.m} onChange={(event) => onChange('m', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm">
+      <select disabled={disabled} aria-label={`${label} minutes`} value={time.m} onChange={(event) => onChange('m', event.target.value)} className="bg-white border border-ink-400/30 rounded-lg px-3 py-2 text-sm disabled:opacity-60">
         {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
       </select>
     </div>
@@ -73,6 +73,7 @@ export default function Availability() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [status, setStatus] = useState(null);
 
   useEffect(() => {
     if (user.role !== 'staff') return undefined;
@@ -81,6 +82,7 @@ export default function Availability() {
     setLoading(true);
     setError('');
     setSuccessMsg('');
+    setStatus(null);
 
     dispatch(fetchMyAvailability(weekStart))
       .unwrap()
@@ -99,10 +101,12 @@ export default function Availability() {
         }, {});
 
         setRanges(loadedRanges);
+        setStatus(availability?.status || null);
       })
       .catch((message) => {
         if (isCurrentRequest) {
           setRanges({});
+          setStatus(null);
           setError(message);
         }
       })
@@ -145,6 +149,8 @@ export default function Availability() {
   };
 
   const handleSave = async () => {
+    if (status === 'approved') return;
+
     const slots = getWeekDates(weekStart).flatMap((date) => (
       (ranges[date] || []).map((range) => ({
         date,
@@ -165,6 +171,7 @@ export default function Availability() {
     try {
       await dispatch(saveMyAvailability({ weekStart, slots })).unwrap();
       setSuccessMsg('Time off saved');
+      setStatus('pending');
     } catch (message) {
       setError(message);
     } finally {
@@ -192,6 +199,15 @@ export default function Availability() {
     );
   }
 
+  const isApproved = status === 'approved';
+  const statusBadge = status === 'pending'
+    ? { label: '⏳ Pending manager approval', className: 'bg-amber-50 text-amber-700' }
+    : status === 'approved'
+      ? { label: '✓ Approved', className: 'bg-forest-50 text-forest-700' }
+      : status === 'rejected'
+        ? { label: '✗ Rejected — edit and resubmit', className: 'bg-red-50 text-red-700' }
+        : { label: 'Not yet submitted', className: 'bg-gray-100 text-gray-600' };
+
   return (
     <div className="min-h-screen bg-cream-50 p-6 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -204,13 +220,15 @@ export default function Availability() {
           </div>
         </Hero>
 
-        <div className="mt-8 flex items-center justify-between bg-cream-100 p-2 rounded-2xl border border-ink-400/10">
-          <button onClick={() => setWeekOffset((offset) => offset - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr; Prev Week</button>
-          <span className="font-medium text-ink-900">{formatWeekLabel(weekStart)}</span>
-          <button onClick={() => setWeekOffset((offset) => offset + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">Next Week &rarr;</button>
-        </div>
+        <Card className="p-8 mt-8">
+          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${statusBadge.className}`}>{statusBadge.label}</span>
+          <div className="mt-6 flex items-center justify-between bg-cream-100 p-2 rounded-2xl border border-ink-400/10">
+            <button onClick={() => setWeekOffset((offset) => offset - 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">&larr; Prev Week</button>
+            <span className="font-medium text-ink-900">{formatWeekLabel(weekStart)}</span>
+            <button onClick={() => setWeekOffset((offset) => offset + 1)} className="px-3 py-1 text-sm font-medium text-forest-600 hover:text-forest-700">Next Week &rarr;</button>
+          </div>
 
-        <Card className="p-8 mt-4">
+          <div className="mt-6">
           {loading && <p className="mb-4 text-sm text-ink-600">Loading availability...</p>}
           {error && <p className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</p>}
           {successMsg && <p className="mb-4 rounded-xl bg-forest-50 border border-forest-200 p-3 text-sm text-forest-700">{successMsg}</p>}
@@ -225,22 +243,29 @@ export default function Availability() {
                 <div className="mt-3 space-y-2">
                   {(ranges[date] || []).map((range, index) => (
                     <div key={`${date}-${index}`} className="flex flex-wrap items-center gap-2 rounded-2xl bg-cream-50 p-3">
-                      <TimeSelects label="Start" time={range.start} onChange={(part, value) => updateRange(date, index, 'start', part, value)} />
+                      <TimeSelects label="Start" time={range.start} disabled={isApproved} onChange={(part, value) => updateRange(date, index, 'start', part, value)} />
                       <span className="text-sm text-ink-600">to</span>
-                      <TimeSelects label="End" time={range.end} onChange={(part, value) => updateRange(date, index, 'end', part, value)} />
-                      <button type="button" onClick={() => deleteRange(date, index)} className="ml-auto rounded-full px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50" aria-label={`Delete range ${index + 1} for ${formatDayLabel(date)}`}>✕</button>
+                      <TimeSelects label="End" time={range.end} disabled={isApproved} onChange={(part, value) => updateRange(date, index, 'end', part, value)} />
+                      {!isApproved && <button type="button" onClick={() => deleteRange(date, index)} className="ml-auto rounded-full px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50" aria-label={`Delete range ${index + 1} for ${formatDayLabel(date)}`}>✕</button>}
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={() => addRange(date)} className="mt-3 rounded-full bg-forest-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-forest-700">+ Add time off</button>
+                {!isApproved && <button type="button" onClick={() => addRange(date)} className="mt-3 rounded-full bg-forest-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-forest-700">+ Add time off</button>}
               </section>
             ))}
           </div>
 
-          <div className="mt-6 flex justify-end">
-            <button onClick={handleSave} disabled={saving} className="rounded-full bg-forest-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-forest-700 disabled:opacity-50">
-              {saving ? 'Saving...' : 'Save time off'}
-            </button>
+          {isApproved ? (
+            <div className="mt-6 rounded-xl bg-forest-50 border border-forest-200 p-4 text-sm text-forest-800">
+              Your time off is approved. To request changes, contact your manager.
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end">
+              <button onClick={handleSave} disabled={saving} className="rounded-full bg-forest-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-forest-700 disabled:opacity-50">
+                {saving ? 'Saving...' : 'Save time off'}
+              </button>
+            </div>
+          )}
           </div>
         </Card>
       </div>
