@@ -74,7 +74,7 @@ export const fetchMyAvailability = createAsyncThunk('shifts/fetchMyAvailability'
 export const saveMyAvailability = createAsyncThunk('shifts/saveMyAvailability', async ({ weekStart, slots }, { rejectWithValue }) => {
   try {
     const res = await apiClient.put('/availability/me', { weekStart, slots });
-    return res.data;
+    return res.data.availability;
   } catch (err) {
     return rejectWithValue(err.response?.data?.error || 'Failed to save availability');
   }

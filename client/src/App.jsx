@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tips from './pages/Tips';
 import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
+import Availability from './pages/Availability';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -33,6 +34,14 @@ function AppRoutes() {
             <Tips />
           </ProtectedRoute>
         } 
+      />
+      <Route
+        path="/availability"
+        element={
+          <ProtectedRoute>
+            <Availability />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/users"

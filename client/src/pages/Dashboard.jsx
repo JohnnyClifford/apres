@@ -313,6 +313,11 @@ export default function Dashboard() {
                 My Tip Payouts
               </Link>
             )}
+            {isStaff && (
+              <Link to="/availability" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
+                My Time Off
+              </Link>
+            )}
             {isOwner && (
               <Link to="/settings" className="inline-flex items-center bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full font-medium transition-colors">
                 ⚙ Settings
