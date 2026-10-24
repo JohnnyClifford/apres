@@ -62,6 +62,24 @@ export const fetchSwaps = createAsyncThunk('shifts/fetchSwaps', async (_, { reje
   }
 });
 
+export const fetchMyAvailability = createAsyncThunk('shifts/fetchMyAvailability', async (weekStart, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.get(`/availability/me?weekStart=${weekStart}`);
+    return res.data.availability;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to fetch availability');
+  }
+});
+
+export const saveMyAvailability = createAsyncThunk('shifts/saveMyAvailability', async ({ weekStart, slots }, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.put('/availability/me', { weekStart, slots });
+    return res.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to save availability');
+  }
+});
+
 export function subscribeToSwapEvents(dispatch) {
   const refreshSwaps = () => dispatch(fetchSwaps());
   socket.on('swap:requested', refreshSwaps);
@@ -75,7 +93,7 @@ export function subscribeToSwapEvents(dispatch) {
 
 const shiftsSlice = createSlice({
   name: 'shifts',
-  initialState: { list: [], users: [], swaps: [], loading: false, error: null },
+  initialState: { list: [], users: [], swaps: [], myAvailability: null, loading: false, error: null },
   reducers: {
     shiftReceivedViaSocket: (state, action) => {
       const index = state.list.findIndex((s) => s._id === action.payload._id);
@@ -118,7 +136,9 @@ const shiftsSlice = createSlice({
         if (index !== -1) state.list[index] = action.payload;
       })
       .addCase(fetchUsers.fulfilled, (state, action) => { state.users = action.payload; })
-      .addCase(fetchSwaps.fulfilled, (state, action) => { state.swaps = action.payload; });
+      .addCase(fetchSwaps.fulfilled, (state, action) => { state.swaps = action.payload; })
+      .addCase(fetchMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
+      .addCase(saveMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; });
   },
 });
 
