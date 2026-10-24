@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const shiftRoutes = require('./routes/shifts');
 const healthRoutes = require('./routes/health');
 const availabilityRoutes = require('./routes/availability');
+const weeklyAvailabilityRoutes = require('./routes/weeklyAvailability');
 const swapRoutes = require('./routes/swaps');
 const tipRoutes = require('./routes/tips');
 const chatRoutes = require('./routes/chat');
@@ -33,6 +34,7 @@ function createApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/shifts', shiftRoutes);
   app.use('/api/availability', availabilityRoutes);
+  app.use('/api/weekly-availability', weeklyAvailabilityRoutes);
   app.use('/api/swaps', swapRoutes);
   app.use('/api/tips', tipRoutes);
   app.use('/api/chat', chatRoutes);
