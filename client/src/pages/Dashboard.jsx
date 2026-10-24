@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchShifts, createShift, fetchUsers, fetchSwaps, deleteShift, updateShift,
   shiftReceivedViaSocket, shiftDeletedViaSocket, swapReceivedViaSocket,
-  subscribeToSwapEvents, socket
+  subscribeToSwapEvents, socket, fetchPendingTimeOffCount
 } from '../features/shiftsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
@@ -22,6 +22,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: shifts, users, swaps, loading, error } = useSelector((state) => state.shifts);
+  const pendingTimeOffCount = useSelector((state) => state.shifts.pendingTimeOffCount);
 
   /* ========================================================================
      2. UI STATE
@@ -72,6 +73,7 @@ export default function Dashboard() {
     dispatch(fetchShifts());
     dispatch(fetchUsers());
     dispatch(fetchSwaps());
+    if (user.role === 'manager' || user.role === 'owner') dispatch(fetchPendingTimeOffCount());
 
     const fetchChatHistory = async () => {
       try {
@@ -515,6 +517,18 @@ export default function Dashboard() {
 
           {/* --- RIGHT COLUMN: SIDE PANELS --- */}
           <div className="space-y-6">
+
+            {isManager && pendingTimeOffCount > 0 && (
+              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+                <h2 className="font-bold text-amber-800">Pending Time Off</h2>
+                <p className="mt-2 text-sm text-amber-800">
+                  ⏳ {pendingTimeOffCount} time off request{pendingTimeOffCount !== 1 ? 's' : ''} awaiting your review.
+                </p>
+                <Link to="/time-off-approvals" className="mt-3 inline-flex items-center rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700">
+                  Review requests →
+                </Link>
+              </div>
+            )}
 
             {/* Owner Coverage Alert */}
             {isOwner && upcomingUnassignedShifts.length > 0 && (

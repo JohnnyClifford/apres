@@ -108,6 +108,15 @@ export const resolveTimeOff = createAsyncThunk('shifts/resolveTimeOff', async ({
   }
 });
 
+export const fetchPendingTimeOffCount = createAsyncThunk('shifts/fetchPendingTimeOffCount', async (_, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.get('/availability/pending');
+    return (res.data.pending || []).length;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to fetch pending time off');
+  }
+});
+
 export const fetchMyWeeklyAvailability = createAsyncThunk('shifts/fetchMyWeeklyAvailability', async (_, { rejectWithValue }) => {
   try {
     const res = await apiClient.get('/weekly-availability/me');
@@ -139,7 +148,7 @@ export function subscribeToSwapEvents(dispatch) {
 
 const shiftsSlice = createSlice({
   name: 'shifts',
-  initialState: { list: [], users: [], swaps: [], myAvailability: null, myWeeklyAvailability: null, pendingTimeOff: [], loading: false, error: null },
+  initialState: { list: [], users: [], swaps: [], myAvailability: null, myWeeklyAvailability: null, pendingTimeOff: [], pendingTimeOffCount: 0, loading: false, error: null },
   reducers: {
     shiftReceivedViaSocket: (state, action) => {
       const index = state.list.findIndex((s) => s._id === action.payload._id);
@@ -190,6 +199,7 @@ const shiftsSlice = createSlice({
       .addCase(resolveTimeOff.fulfilled, (state, action) => {
         state.pendingTimeOff = state.pendingTimeOff.filter((request) => request._id !== action.payload._id);
       })
+      .addCase(fetchPendingTimeOffCount.fulfilled, (state, action) => { state.pendingTimeOffCount = action.payload; })
       .addCase(fetchMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; })
       .addCase(saveMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; });
   },
