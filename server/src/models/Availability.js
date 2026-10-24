@@ -20,6 +20,20 @@ const availabilitySchema = new mongoose.Schema(
         endTime: { type: String, required: true },
       },
     ],
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    resolvedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
