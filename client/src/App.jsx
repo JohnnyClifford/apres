@@ -8,6 +8,7 @@ import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
 import Availability from './pages/Availability';
 import WeeklyAvailability from './pages/WeeklyAvailability';
+import TimeOffApprovals from './pages/TimeOffApprovals';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -45,6 +46,14 @@ function AppRoutes() {
         }
       />
       <Route path="/availability" element={<Navigate to="/time-off" replace />} />
+      <Route
+        path="/time-off-approvals"
+        element={
+          <ProtectedRoute>
+            <TimeOffApprovals />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/weekly-availability"
         element={

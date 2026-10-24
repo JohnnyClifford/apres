@@ -89,6 +89,25 @@ export const deleteMyAvailability = createAsyncThunk('shifts/deleteMyAvailabilit
   }
 });
 
+export const fetchPendingTimeOff = createAsyncThunk('shifts/fetchPendingTimeOff', async (weekStart, { rejectWithValue }) => {
+  try {
+    const url = weekStart ? `/availability/pending?weekStart=${weekStart}` : '/availability/pending';
+    const res = await apiClient.get(url);
+    return res.data.pending;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to fetch pending time off');
+  }
+});
+
+export const resolveTimeOff = createAsyncThunk('shifts/resolveTimeOff', async ({ id, status }, { rejectWithValue }) => {
+  try {
+    const res = await apiClient.patch(`/availability/${id}/status`, { status });
+    return res.data.availability;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || 'Failed to resolve time off');
+  }
+});
+
 export const fetchMyWeeklyAvailability = createAsyncThunk('shifts/fetchMyWeeklyAvailability', async (_, { rejectWithValue }) => {
   try {
     const res = await apiClient.get('/weekly-availability/me');
@@ -120,7 +139,7 @@ export function subscribeToSwapEvents(dispatch) {
 
 const shiftsSlice = createSlice({
   name: 'shifts',
-  initialState: { list: [], users: [], swaps: [], myAvailability: null, myWeeklyAvailability: null, loading: false, error: null },
+  initialState: { list: [], users: [], swaps: [], myAvailability: null, myWeeklyAvailability: null, pendingTimeOff: [], loading: false, error: null },
   reducers: {
     shiftReceivedViaSocket: (state, action) => {
       const index = state.list.findIndex((s) => s._id === action.payload._id);
@@ -167,6 +186,10 @@ const shiftsSlice = createSlice({
       .addCase(fetchMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
       .addCase(saveMyAvailability.fulfilled, (state, action) => { state.myAvailability = action.payload; })
       .addCase(deleteMyAvailability.fulfilled, (state) => { state.myAvailability = null; })
+      .addCase(fetchPendingTimeOff.fulfilled, (state, action) => { state.pendingTimeOff = action.payload; })
+      .addCase(resolveTimeOff.fulfilled, (state, action) => {
+        state.pendingTimeOff = state.pendingTimeOff.filter((request) => request._id !== action.payload._id);
+      })
       .addCase(fetchMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; })
       .addCase(saveMyWeeklyAvailability.fulfilled, (state, action) => { state.myWeeklyAvailability = action.payload; });
   },
